@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="Barkod Okuyucu Stok Sayım Uygulaması - Kamera ile barkod okuyun, stok sayın, Excel'e aktarın">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Stok Sayım">
+    
+    <title>📦 Barkod Stok Sayım</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    
+    <!-- External Libraries -->
+    <script src="https://unpkg.com/@AntoineMeille/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-icon">📦</div>
+            <h1>Stok Sayım</h1>
+            <div class="splash-loader">
+                <div class="loader-bar"></div>
+            </div>
+            <p>Yükleniyor...</p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="app hidden">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">📦</span>
+                    <span class="logo-text">Stok Sayım</span>
+                </div>
+                <div class="header-actions">
+                    <button id="clear-all-btn" class="btn btn-ghost" title="Tümünü Sil">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-value" id="total-products">0</span>
+                <span class="stat-label">Ürün Çeşidi</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value" id="total-count">0</span>
+                <span class="stat-label">Toplam Adet</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value" id="last-scan">--</span>
+                <span class="stat-label">Son Okuma</span>
+            </div>
+        </div>
+
+        <!-- Scanner Section -->
+        <section class="scanner-section">
+            <div id="scanner-container" class="scanner-container">
+                <div id="reader" class="reader"></div>
+                <div class="scanner-overlay">
+                    <div class="scanner-frame">
+                        <div class="corner top-left"></div>
+                        <div class="corner top-right"></div>
+                        <div class="corner bottom-left"></div>
+                        <div class="corner bottom-right"></div>
+                        <div class="scan-line"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="scanner-controls">
+                <button id="start-scan-btn" class="btn btn-primary btn-lg">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Barkod Tara</span>
+                </button>
+                <button id="stop-scan-btn" class="btn btn-secondary btn-lg hidden">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                    </svg>
+                    <span>Taramayı Durdur</span>
+                </button>
+            </div>
+
+            <!-- Manual Entry -->
+            <div class="manual-entry">
+                <div class="manual-entry-header">
+                    <span class="divider-line"></span>
+                    <span class="divider-text">veya manuel giriş</span>
+                    <span class="divider-line"></span>
+                </div>
+                <div class="manual-entry-form">
+                    <input type="text" id="manual-barcode" class="input" placeholder="Barkod numarası girin...">
+                    <input type="number" id="manual-quantity" class="input input-small" placeholder="Adet" value="1" min="1">
+                    <button id="manual-add-btn" class="btn btn-accent">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Product List Section -->
+        <section class="products-section">
+            <div class="section-header">
+                <h2>📋 Stok Listesi</h2>
+                <div class="section-actions">
+                    <button id="export-btn" class="btn btn-success">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Excel'e Aktar</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="search-bar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+                <input type="text" id="search-input" class="search-input" placeholder="Barkod ara...">
+            </div>
+
+            <div id="product-list" class="product-list">
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <h3>Henüz ürün yok</h3>
+                    <p>Barkod tarayarak veya manuel girerek başlayın</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Toast Container -->
+        <div id="toast-container" class="toast-container"></div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-icon warning">⚠️</div>
+            <h3>Tüm Verileri Sil?</h3>
+            <p>Bu işlem geri alınamaz. Tüm barkodlar ve stok bilgileri silinecek.</p>
+            <div class="modal-actions">
+                <button id="cancel-delete" class="btn btn-ghost">İptal</button>
+                <button id="confirm-delete" class="btn btn-danger">Sil</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Stok Düzenle</h3>
+                <button id="close-edit-modal" class="btn btn-ghost btn-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Barkod</label>
+                    <input type="text" id="edit-barcode" class="input" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Ürün Adı (Opsiyonel)</label>
+                    <input type="text" id="edit-name" class="input" placeholder="Ürün adı girin...">
+                </div>
+                <div class="form-group">
+                    <label>Adet</label>
+                    <div class="quantity-control">
+                        <button id="edit-decrease" class="btn btn-ghost btn-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </button>
+                        <input type="number" id="edit-quantity" class="input input-center" min="1">
+                        <button id="edit-increase" class="btn btn-ghost btn-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="delete-product-btn" class="btn btn-danger">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    <span>Sil</span>
+                </button>
+                <button id="save-edit-btn" class="btn btn-primary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    <span>Kaydet</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
