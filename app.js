@@ -264,24 +264,45 @@ class BarcodeStockApp {
 
     playBeep() {
         try {
-            // Web Audio API ile bip sesi
+            // iOS için AudioContext'i resume et
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
 
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            // iOS'ta ses çalmak için context'i resume etmek gerekli
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
 
-            oscillator.frequency.value = 1200; // Hz
-            oscillator.type = 'sine';
+            // Market tarayıcı bip sesi - çift tonlu
+            const now = audioContext.currentTime;
 
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            // İlk ton (yüksek)
+            const osc1 = audioContext.createOscillator();
+            const gain1 = audioContext.createGain();
+            osc1.connect(gain1);
+            gain1.connect(audioContext.destination);
+            osc1.frequency.value = 1800; // Hz - yüksek ton
+            osc1.type = 'sine';
+            gain1.gain.setValueAtTime(0.5, now);
+            gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+            osc1.start(now);
+            osc1.stop(now + 0.08);
 
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.1);
+            // İkinci ton (daha yüksek) - hemen arkasından
+            const osc2 = audioContext.createOscillator();
+            const gain2 = audioContext.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioContext.destination);
+            osc2.frequency.value = 2400; // Hz - daha yüksek ton
+            osc2.type = 'sine';
+            gain2.gain.setValueAtTime(0.6, now + 0.1);
+            gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc2.start(now + 0.1);
+            osc2.stop(now + 0.2);
+
+            // Context'i temizle
+            setTimeout(() => audioContext.close(), 500);
         } catch (e) {
-            // Ses çalamıyorsa sessizce devam et
+            console.log('Ses çalınamadı:', e);
         }
     }
 
