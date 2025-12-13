@@ -78,57 +78,105 @@ class BarcodeStockApp {
     // =============================================
 
     async startScanning() {
+        const container = document.getElementById('scanner-container');
+        container.classList.add('active');
+
+        document.getElementById('start-scan-btn').classList.add('hidden');
+        document.getElementById('stop-scan-btn').classList.remove('hidden');
+
         try {
-            const container = document.getElementById('scanner-container');
-            container.classList.add('active');
-
-            document.getElementById('start-scan-btn').classList.add('hidden');
-            document.getElementById('stop-scan-btn').classList.remove('hidden');
-
             // Önceki scanner'ı temizle
             if (this.html5QrcodeScanner) {
                 try {
                     await this.html5QrcodeScanner.stop();
-                } catch (e) {
-                    // Ignore
-                }
+                } catch (e) { }
                 this.html5QrcodeScanner = null;
+            }
+
+            // Kamera erişimi kontrolü
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Bu tarayıcı kamera erişimini desteklemiyor');
+            }
+
+            // Önce kamera izni al
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+            } catch (permErr) {
+                throw new Error('Kamera izni verilmedi');
             }
 
             this.html5QrcodeScanner = new Html5Qrcode("reader");
 
-            // Basit ve stabil yapılandırma - tüm cihazlarda çalışır
+            // Mevcut kameraları listele
+            const cameras = await Html5Qrcode.getCameras();
+            console.log('Bulunan kameralar:', cameras);
+
+            if (!cameras || cameras.length === 0) {
+                throw new Error('Kamera bulunamadı');
+            }
+
+            // Arka kamerayı bul (varsa)
+            let cameraId = cameras[0].id;
+            for (const camera of cameras) {
+                if (camera.label.toLowerCase().includes('back') ||
+                    camera.label.toLowerCase().includes('arka') ||
+                    camera.label.toLowerCase().includes('rear') ||
+                    camera.label.toLowerCase().includes('environment')) {
+                    cameraId = camera.id;
+                    break;
+                }
+            }
+
+            // Eğer birden fazla kamera varsa sonuncuyu kullan (genelde arka kamera)
+            if (cameras.length > 1) {
+                cameraId = cameras[cameras.length - 1].id;
+            }
+
+            console.log('Seçilen kamera:', cameraId);
+
             const config = {
-                fps: 15,
-                qrbox: { width: 280, height: 120 },
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.QR_CODE
-                ]
+                fps: 10,
+                qrbox: { width: 250, height: 100 },
+                aspectRatio: 1.5
             };
 
             await this.html5QrcodeScanner.start(
-                { facingMode: "environment" },
+                cameraId,
                 config,
-                (decodedText, decodedResult) => this.onScanSuccess(decodedText, decodedResult),
+                (decodedText) => this.onScanSuccess(decodedText),
                 () => { }
             );
 
             this.isScanning = true;
-            console.log('Kamera başarıyla başlatıldı');
-
-            // Kamera başladıktan sonra ayarları optimize et (opsiyonel)
-            setTimeout(() => this.optimizeCameraSettings(), 1000);
+            this.showToast('success', 'Kamera Açıldı', 'Barkodu tarama alanına getirin');
 
         } catch (err) {
-            console.error('Scanner start error:', err);
-            this.showToast('error', 'Kamera Hatası', 'Kamera erişimi sağlanamadı. Lütfen izinleri kontrol edin.');
-            this.resetScannerUI();
+            console.error('Kamera hatası:', err);
+
+            // Alternatif yöntem dene
+            try {
+                console.log('Alternatif yöntem deneniyor...');
+
+                if (!this.html5QrcodeScanner) {
+                    this.html5QrcodeScanner = new Html5Qrcode("reader");
+                }
+
+                await this.html5QrcodeScanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 250, height: 100 } },
+                    (decodedText) => this.onScanSuccess(decodedText),
+                    () => { }
+                );
+
+                this.isScanning = true;
+                this.showToast('success', 'Kamera Açıldı', 'Barkodu tarama alanına getirin');
+
+            } catch (fallbackErr) {
+                console.error('Fallback hatası:', fallbackErr);
+                this.showToast('error', 'Kamera Hatası', err.message || 'Kamera başlatılamadı');
+                this.resetScannerUI();
+            }
         }
     }
 
@@ -137,31 +185,6 @@ class BarcodeStockApp {
         document.getElementById('scanner-container').classList.remove('active');
         document.getElementById('start-scan-btn').classList.remove('hidden');
         document.getElementById('stop-scan-btn').classList.add('hidden');
-    }
-
-    async optimizeCameraSettings() {
-        try {
-            const videoElement = document.querySelector('#reader video');
-            if (videoElement && videoElement.srcObject) {
-                const track = videoElement.srcObject.getVideoTracks()[0];
-                if (track && track.getCapabilities) {
-                    const capabilities = track.getCapabilities();
-                    const constraints = {};
-
-                    // Sürekli otomatik odak
-                    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-                        constraints.focusMode = 'continuous';
-                    }
-
-                    if (Object.keys(constraints).length > 0) {
-                        await track.applyConstraints({ advanced: [constraints] });
-                        console.log('Kamera optimize edildi');
-                    }
-                }
-            }
-        } catch (err) {
-            // Sessizce devam et
-        }
     }
 
     async stopScanning() {
