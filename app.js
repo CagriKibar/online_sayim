@@ -85,80 +85,22 @@ class BarcodeStockApp {
             document.getElementById('start-scan-btn').classList.add('hidden');
             document.getElementById('stop-scan-btn').classList.remove('hidden');
 
+            // Önceki scanner'ı temizle
+            if (this.html5QrcodeScanner) {
+                try {
+                    await this.html5QrcodeScanner.stop();
+                } catch (e) {
+                    // Ignore
+                }
+                this.html5QrcodeScanner = null;
+            }
+
             this.html5QrcodeScanner = new Html5Qrcode("reader");
 
-            // iPhone ve ince barkodlar için optimize edilmiş yapılandırma
+            // Basit ve stabil yapılandırma - tüm cihazlarda çalışır
             const config = {
-                fps: 30, // Yüksek frame rate - daha hızlı okuma
-                qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    // Dinamik tarama alanı - ekranın %75'i
-                    const minEdgePercentage = 0.75;
-                    const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-                    const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
-                    return {
-                        width: Math.min(qrboxSize, 400),
-                        height: Math.min(Math.floor(qrboxSize * 0.4), 180)
-                    };
-                },
-                aspectRatio: 1.777778, // 16:9 en-boy oranı
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.CODE_93,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.ITF,
-                    Html5QrcodeSupportedFormats.CODABAR,
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                    Html5QrcodeSupportedFormats.DATA_MATRIX
-                ],
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true // Native API kullan (daha hızlı)
-                },
-                rememberLastUsedCamera: true,
-                showTorchButtonIfSupported: true
-            };
-
-            // Yüksek çözünürlüklü kamera ayarları - iPhone için kritik
-            const cameraConfig = {
-                facingMode: "environment",
-                advanced: [
-                    { width: { min: 1280, ideal: 1920, max: 2560 } },
-                    { height: { min: 720, ideal: 1080, max: 1440 } },
-                    { focusMode: "continuous" },
-                    { exposureMode: "continuous" },
-                    { whiteBalanceMode: "continuous" }
-                ]
-            };
-
-            await this.html5QrcodeScanner.start(
-                cameraConfig,
-                config,
-                (decodedText, decodedResult) => this.onScanSuccess(decodedText, decodedResult),
-                () => { }
-            );
-
-            // Kamera akışı başladıktan sonra odak ve zoom ayarla
-            this.optimizeCameraSettings();
-
-            this.isScanning = true;
-        } catch (err) {
-            console.error('Scanner start error:', err);
-            // Yüksek çözünürlük başarısız olursa fallback dene
-            await this.startScanningFallback();
-        }
-    }
-
-    async startScanningFallback() {
-        try {
-            console.log('Fallback scanner moduna geçiliyor...');
-
-            const config = {
-                fps: 20,
-                qrbox: { width: 300, height: 150 },
-                aspectRatio: 1.5,
+                fps: 15,
+                qrbox: { width: 280, height: 120 },
                 formatsToSupport: [
                     Html5QrcodeSupportedFormats.EAN_13,
                     Html5QrcodeSupportedFormats.EAN_8,
@@ -167,10 +109,7 @@ class BarcodeStockApp {
                     Html5QrcodeSupportedFormats.UPC_A,
                     Html5QrcodeSupportedFormats.UPC_E,
                     Html5QrcodeSupportedFormats.QR_CODE
-                ],
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                }
+                ]
             };
 
             await this.html5QrcodeScanner.start(
@@ -181,11 +120,23 @@ class BarcodeStockApp {
             );
 
             this.isScanning = true;
+            console.log('Kamera başarıyla başlatıldı');
+
+            // Kamera başladıktan sonra ayarları optimize et (opsiyonel)
+            setTimeout(() => this.optimizeCameraSettings(), 1000);
+
         } catch (err) {
-            console.error('Fallback scanner error:', err);
-            this.showToast('error', 'Kamera Hatası', 'Kamera erişimi sağlanamadı. Lütfen kamera izinlerini kontrol edin.');
-            this.stopScanning();
+            console.error('Scanner start error:', err);
+            this.showToast('error', 'Kamera Hatası', 'Kamera erişimi sağlanamadı. Lütfen izinleri kontrol edin.');
+            this.resetScannerUI();
         }
+    }
+
+    resetScannerUI() {
+        this.isScanning = false;
+        document.getElementById('scanner-container').classList.remove('active');
+        document.getElementById('start-scan-btn').classList.remove('hidden');
+        document.getElementById('stop-scan-btn').classList.add('hidden');
     }
 
     async optimizeCameraSettings() {
@@ -193,36 +144,23 @@ class BarcodeStockApp {
             const videoElement = document.querySelector('#reader video');
             if (videoElement && videoElement.srcObject) {
                 const track = videoElement.srcObject.getVideoTracks()[0];
-                if (track) {
-                    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-
+                if (track && track.getCapabilities) {
+                    const capabilities = track.getCapabilities();
                     const constraints = {};
 
-                    // Sürekli otomatik odak (ince barkodlar için kritik)
+                    // Sürekli otomatik odak
                     if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
                         constraints.focusMode = 'continuous';
                     }
 
-                    // Sürekli pozlama
-                    if (capabilities.exposureMode && capabilities.exposureMode.includes('continuous')) {
-                        constraints.exposureMode = 'continuous';
-                    }
-
-                    // Zoom - ince barkodlar için hafif zoom
-                    if (capabilities.zoom) {
-                        // Zoom aralığının %20-30'unda tut
-                        const zoomRange = capabilities.zoom.max - capabilities.zoom.min;
-                        constraints.zoom = capabilities.zoom.min + (zoomRange * 0.25);
-                    }
-
                     if (Object.keys(constraints).length > 0) {
                         await track.applyConstraints({ advanced: [constraints] });
-                        console.log('Kamera ayarları optimize edildi:', constraints);
+                        console.log('Kamera optimize edildi');
                     }
                 }
             }
         } catch (err) {
-            console.log('Kamera optimizasyonu uygulanamadı:', err);
+            // Sessizce devam et
         }
     }
 
