@@ -9,7 +9,7 @@ class BarcodeStockApp {
         this.isScanning = false;
         this.editingProduct = null;
         this.lastScanTime = 0;
-        this.scanCooldown = 1500;
+        this.scanCooldown = 800; // Hızlı ardışık tarama için optimize edildi
 
         this.init();
     }
@@ -87,24 +87,142 @@ class BarcodeStockApp {
 
             this.html5QrcodeScanner = new Html5Qrcode("reader");
 
+            // iPhone ve ince barkodlar için optimize edilmiş yapılandırma
             const config = {
-                fps: 10,
-                qrbox: { width: 250, height: 150 },
-                aspectRatio: 1.333
+                fps: 30, // Yüksek frame rate - daha hızlı okuma
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    // Dinamik tarama alanı - ekranın %75'i
+                    const minEdgePercentage = 0.75;
+                    const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                    const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+                    return {
+                        width: Math.min(qrboxSize, 400),
+                        height: Math.min(Math.floor(qrboxSize * 0.4), 180)
+                    };
+                },
+                aspectRatio: 1.777778, // 16:9 en-boy oranı
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.CODE_93,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.ITF,
+                    Html5QrcodeSupportedFormats.CODABAR,
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.DATA_MATRIX
+                ],
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true // Native API kullan (daha hızlı)
+                },
+                rememberLastUsedCamera: true,
+                showTorchButtonIfSupported: true
+            };
+
+            // Yüksek çözünürlüklü kamera ayarları - iPhone için kritik
+            const cameraConfig = {
+                facingMode: "environment",
+                advanced: [
+                    { width: { min: 1280, ideal: 1920, max: 2560 } },
+                    { height: { min: 720, ideal: 1080, max: 1440 } },
+                    { focusMode: "continuous" },
+                    { exposureMode: "continuous" },
+                    { whiteBalanceMode: "continuous" }
+                ]
+            };
+
+            await this.html5QrcodeScanner.start(
+                cameraConfig,
+                config,
+                (decodedText, decodedResult) => this.onScanSuccess(decodedText, decodedResult),
+                () => { }
+            );
+
+            // Kamera akışı başladıktan sonra odak ve zoom ayarla
+            this.optimizeCameraSettings();
+
+            this.isScanning = true;
+        } catch (err) {
+            console.error('Scanner start error:', err);
+            // Yüksek çözünürlük başarısız olursa fallback dene
+            await this.startScanningFallback();
+        }
+    }
+
+    async startScanningFallback() {
+        try {
+            console.log('Fallback scanner moduna geçiliyor...');
+
+            const config = {
+                fps: 20,
+                qrbox: { width: 300, height: 150 },
+                aspectRatio: 1.5,
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.QR_CODE
+                ],
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
             };
 
             await this.html5QrcodeScanner.start(
                 { facingMode: "environment" },
                 config,
-                (decodedText) => this.onScanSuccess(decodedText),
+                (decodedText, decodedResult) => this.onScanSuccess(decodedText, decodedResult),
                 () => { }
             );
 
             this.isScanning = true;
         } catch (err) {
-            console.error('Scanner start error:', err);
-            this.showToast('error', 'Kamera Hatası', 'Kamera erişimi sağlanamadı');
+            console.error('Fallback scanner error:', err);
+            this.showToast('error', 'Kamera Hatası', 'Kamera erişimi sağlanamadı. Lütfen kamera izinlerini kontrol edin.');
             this.stopScanning();
+        }
+    }
+
+    async optimizeCameraSettings() {
+        try {
+            const videoElement = document.querySelector('#reader video');
+            if (videoElement && videoElement.srcObject) {
+                const track = videoElement.srcObject.getVideoTracks()[0];
+                if (track) {
+                    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+
+                    const constraints = {};
+
+                    // Sürekli otomatik odak (ince barkodlar için kritik)
+                    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                        constraints.focusMode = 'continuous';
+                    }
+
+                    // Sürekli pozlama
+                    if (capabilities.exposureMode && capabilities.exposureMode.includes('continuous')) {
+                        constraints.exposureMode = 'continuous';
+                    }
+
+                    // Zoom - ince barkodlar için hafif zoom
+                    if (capabilities.zoom) {
+                        // Zoom aralığının %20-30'unda tut
+                        const zoomRange = capabilities.zoom.max - capabilities.zoom.min;
+                        constraints.zoom = capabilities.zoom.min + (zoomRange * 0.25);
+                    }
+
+                    if (Object.keys(constraints).length > 0) {
+                        await track.applyConstraints({ advanced: [constraints] });
+                        console.log('Kamera ayarları optimize edildi:', constraints);
+                    }
+                }
+            }
+        } catch (err) {
+            console.log('Kamera optimizasyonu uygulanamadı:', err);
         }
     }
 
@@ -123,16 +241,47 @@ class BarcodeStockApp {
         document.getElementById('stop-scan-btn').classList.add('hidden');
     }
 
-    onScanSuccess(barcode) {
+    onScanSuccess(barcode, decodedResult) {
         const now = Date.now();
         if (now - this.lastScanTime < this.scanCooldown) return;
         this.lastScanTime = now;
 
         this.addProduct(barcode.trim());
 
-        // Vibrate on success
+        // Görsel geri bildirim - tarama animasyonu
+        const container = document.getElementById('scanner-container');
+        container.classList.add('scan-success');
+        setTimeout(() => container.classList.remove('scan-success'), 500);
+
+        // Vibrate on success (iPhone için önemli)
         if (navigator.vibrate) {
-            navigator.vibrate(100);
+            navigator.vibrate([50, 30, 50]); // Kısa titreşim paterni
+        }
+
+        // Sesli geri bildirim (opsiyonel - kullanıcı ayarlarına göre)
+        this.playBeep();
+    }
+
+    playBeep() {
+        try {
+            // Web Audio API ile bip sesi
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 1200; // Hz
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            // Ses çalamıyorsa sessizce devam et
         }
     }
 
