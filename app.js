@@ -684,46 +684,56 @@ class BarcodeStockApp {
     }
 
     playBeep() {
+        console.log('🔊 Ses çalınıyor...');
         try {
-            // iOS için AudioContext'i resume et
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // AudioContext oluştur
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) {
+                console.log('AudioContext desteklenmiyor');
+                return;
+            }
 
-            // iOS'ta ses çalmak için context'i resume etmek gerekli
+            const audioContext = new AudioContext();
+
+            // iOS/Safari için context'i resume et
             if (audioContext.state === 'suspended') {
                 audioContext.resume();
             }
 
-            // Market tarayıcı bip sesi - çift tonlu
             const now = audioContext.currentTime;
 
-            // İlk ton (yüksek)
+            // BİP SESİ 1 - Yüksek ton
             const osc1 = audioContext.createOscillator();
             const gain1 = audioContext.createGain();
             osc1.connect(gain1);
             gain1.connect(audioContext.destination);
-            osc1.frequency.value = 1800; // Hz - yüksek ton
-            osc1.type = 'sine';
-            gain1.gain.setValueAtTime(0.5, now);
-            gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+            osc1.frequency.value = 1800;
+            osc1.type = 'square'; // square daha yüksek ses çıkarır
+            gain1.gain.setValueAtTime(0.8, now); // Daha yüksek volume
+            gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
             osc1.start(now);
-            osc1.stop(now + 0.08);
+            osc1.stop(now + 0.1);
 
-            // İkinci ton (daha yüksek) - hemen arkasından
+            // BİP SESİ 2 - Daha yüksek ton
             const osc2 = audioContext.createOscillator();
             const gain2 = audioContext.createGain();
             osc2.connect(gain2);
             gain2.connect(audioContext.destination);
-            osc2.frequency.value = 2400; // Hz - daha yüksek ton
-            osc2.type = 'sine';
-            gain2.gain.setValueAtTime(0.6, now + 0.1);
-            gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-            osc2.start(now + 0.1);
-            osc2.stop(now + 0.2);
+            osc2.frequency.value = 2400;
+            osc2.type = 'square';
+            gain2.gain.setValueAtTime(0.9, now + 0.12);
+            gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+            osc2.start(now + 0.12);
+            osc2.stop(now + 0.25);
 
             // Context'i temizle
-            setTimeout(() => audioContext.close(), 500);
+            setTimeout(() => {
+                audioContext.close().catch(() => { });
+            }, 500);
+
+            console.log('🔊 Ses çalındı!');
         } catch (e) {
-            console.log('Ses çalınamadı:', e);
+            console.error('Ses hatası:', e);
         }
     }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'barcode-stock-v1';
+const CACHE_NAME = 'barcode-stock-v10';
 const urlsToCache = [
     './',
     './index.html',
