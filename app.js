@@ -338,46 +338,17 @@ class BarcodeStockApp {
             // Mod config'inden değerleri al
             const modeConfig = this.currentModeConfig || this.getScanModeConfig('optimize');
 
-            // Tarama alanı - GENİŞ DİKDÖRTGEN (yatay barkodlar için ideal)
-            const scanBoxWidth = Math.min(
-                window.innerWidth * 0.90,  // Ekranın %90'ı
-                400                         // Max 400px
-            );
-            const scanBoxHeight = Math.floor(scanBoxWidth * 0.45); // Yükseklik = genişliğin %45'i
-
+            // 🔥 FULL SCREEN TARAMA - Tüm ekranı tara, kısıtlama YOK
             const scanConfig = {
-                fps: modeConfig.fps, // Mod'a göre FPS
-                // � GENİŞ DİKDÖRTGEN TARAMA ALANI
-                // Yatay barkodlar (ITF, CODE-128, EAN-13) için optimize
-                qrbox: {
-                    width: Math.floor(scanBoxWidth),
-                    height: scanBoxHeight
-                },
-                aspectRatio: 16 / 9, // Geniş ekran oranı
-                disableFlip: false,
-                // TÜM BARKOD FORMATLARI - maksimum uyumluluk
-                formatsToSupport: [
-                    // Standart ürün barkodları
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    // Endüstriyel barkodlar (GENİŞ)
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.CODE_93,
-                    Html5QrcodeSupportedFormats.CODABAR,
-                    Html5QrcodeSupportedFormats.ITF,  // Koli barkodları
-                    // 2D Barkodlar
-                    Html5QrcodeSupportedFormats.DATA_MATRIX,
-                    Html5QrcodeSupportedFormats.PDF_417,
-                    Html5QrcodeSupportedFormats.AZTEC,
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                    Html5QrcodeSupportedFormats.MAXICODE
-                ]
+                fps: modeConfig.fps,
+                // qrbox KALDIRILDI - TÜM KAMERA ALANINI TARA
+                // Bu sayede herhangi bir barkod, herhangi bir konumda okunabilir
+                aspectRatio: 16 / 9,
+                disableFlip: false
+                // formatsToSupport KALDIRILDI - TÜM FORMATLARI OTOMATİK ALGILAR
             };
 
-            console.log(`🎯 Tarama başlıyor - Mod: ${this.currentScanMode} | FPS: ${scanConfig.fps} | Kutu: ${scanBoxWidth}x${scanBoxHeight}px`);
+            console.log(`🔥 FULL SCREEN Tarama - Mod: ${this.currentScanMode} | FPS: ${scanConfig.fps} | Tüm formatlar aktif`);
 
             // iOS için direkt facingMode kullan (kamera listesi yerine)
             if (isIOS) {
