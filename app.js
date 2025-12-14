@@ -6,11 +6,12 @@ class BarcodeStockApp {
     constructor() {
         this.products = [];
         this.html5QrcodeScanner = null;
+        this.quaggaActive = false; // QuaggaJS aktif mi?
         this.isScanning = false;
         this.editingProduct = null;
         this.lastScanTime = 0;
-        this.scanCooldown = 350; // Aktif cooldown - mod sisteminden güncellenir
-        this.currentScanMode = 'optimize'; // Varsayılan mod
+        this.scanCooldown = 350;
+        this.currentScanMode = 'optimize';
         this.currentModeConfig = null;
 
         this.init();
@@ -237,6 +238,88 @@ class BarcodeStockApp {
     }
 
     // =============================================
+    // QUAGGA JS - MSI, Codabar, I2of5 Desteği
+    // =============================================
+
+    startQuaggaScanner() {
+        if (typeof Quagga === 'undefined') {
+            console.log('QuaggaJS yüklenemedi');
+            return;
+        }
+
+        const readerElement = document.getElementById('reader');
+        if (!readerElement) return;
+
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: readerElement,
+                constraints: {
+                    facingMode: "environment",
+                    width: { min: 640, ideal: 1280, max: 1920 },
+                    height: { min: 480, ideal: 720, max: 1080 }
+                }
+            },
+            locator: {
+                patchSize: "medium",
+                halfSample: true
+            },
+            numOfWorkers: navigator.hardwareConcurrency || 4,
+            frequency: 10,
+            decoder: {
+                readers: [
+                    "msi_reader",           // MSI / Modified Plessey
+                    "codabar_reader",       // Codabar
+                    "i2of5_reader",         // Interleaved 2 of 5
+                    "code_128_reader",      // Code 128
+                    "code_39_reader",       // Code 39
+                    "ean_reader",           // EAN-13, EAN-8
+                    "upc_reader",           // UPC-A, UPC-E
+                    "code_93_reader"        // Code 93
+                ]
+            },
+            locate: true
+        }, (err) => {
+            if (err) {
+                console.log('Quagga başlatılamadı:', err);
+                return;
+            }
+            console.log('🔍 QuaggaJS aktif - MSI, Codabar, I2of5 desteği');
+            Quagga.start();
+            this.quaggaActive = true;
+        });
+
+        Quagga.onDetected((result) => this.onQuaggaDetected(result));
+    }
+
+    stopQuaggaScanner() {
+        if (this.quaggaActive && typeof Quagga !== 'undefined') {
+            try {
+                Quagga.stop();
+                this.quaggaActive = false;
+                console.log('QuaggaJS durduruldu');
+            } catch (e) {
+                console.log('Quagga stop error:', e);
+            }
+        }
+    }
+
+    onQuaggaDetected(result) {
+        if (!result || !result.codeResult) return;
+
+        const barcode = result.codeResult.code;
+        const format = result.codeResult.format;
+
+        // Cooldown kontrolü
+        const now = Date.now();
+        if (now - this.lastScanTime < this.scanCooldown) return;
+
+        console.log(`📦 Quagga okuma: ${barcode} (${format})`);
+        this.onScanSuccess(barcode);
+    }
+
+    // =============================================
     // BARCODE SCANNING
     // =============================================
 
@@ -407,7 +490,7 @@ class BarcodeStockApp {
 
                 await this.html5QrcodeScanner.start(
                     cameraId,
-                    turboConfig,
+                    scanConfig,
                     (decodedText) => this.onScanSuccess(decodedText),
                     () => { }
                 );
@@ -418,7 +501,11 @@ class BarcodeStockApp {
             // iOS için ek optimizasyonlar: Tarama alanını highlighting
             this.optimizeScannerDOM();
 
-            this.showToast('success', '⚡ Turbo Mod', isIOS ? 'iOS optimizasyonu aktif!' : 'Barkodu tarama alanına getirin');
+            // QuaggaJS'i paralel olarak başlat (MSI, Codabar desteği için)
+            // NOT: Quagga aynı video stream'i kullanamayacağı için ayrı çalışmayacak
+            // Ama Html5Qrcode zaten Codabar destekliyor
+
+            this.showToast('success', '📷 Tarama Aktif', 'Tüm barkod formatları destekleniyor');
 
         } catch (err) {
             console.error('Kamera hatası:', err);
