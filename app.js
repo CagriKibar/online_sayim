@@ -105,23 +105,29 @@ class BarcodeStockApp {
                 throw new Error('Bu tarayıcı kamera erişimini desteklemiyor');
             }
 
-            // iOS için özel kamera constraint'leri - YÜKSEK PERFORMANS
+            // 📷 YÜKSEK ÇÖZÜNÜRLÜK - Tüm barkod boyutları için optimize
             const videoConstraints = isIOS ? {
                 facingMode: { ideal: 'environment' },
-                width: { ideal: 1280, max: 1920 },
-                height: { ideal: 720, max: 1080 },
+                // Yüksek çözünürlük: küçük ve ince barkodlar için kritik
+                width: { ideal: 1920, min: 1280 },
+                height: { ideal: 1080, min: 720 },
                 frameRate: { ideal: 60, min: 30 },
                 // iOS için kritik optimizasyonlar
                 advanced: [
                     { focusMode: 'continuous' },
                     { exposureMode: 'continuous' },
-                    { whiteBalanceMode: 'continuous' }
+                    { whiteBalanceMode: 'continuous' },
+                    { zoom: 1.5 } // Hafif zoom - uzak barkodlar için
                 ]
             } : {
                 facingMode: { ideal: 'environment' },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                frameRate: { ideal: 30, min: 15 }
+                // Android için de yüksek çözünürlük
+                width: { ideal: 1920, min: 1280 },
+                height: { ideal: 1080, min: 720 },
+                frameRate: { ideal: 30, min: 15 },
+                advanced: [
+                    { focusMode: 'continuous' }
+                ]
             };
 
             // Önce kamera izni al ve iOS için stream'i hazırla
@@ -165,23 +171,39 @@ class BarcodeStockApp {
                 verbose: false
             });
 
-            // ⚡ iOS İÇİN TURBO HIZLI KONFIGÜRASYON ⚡
+            // 🎯 PRO BARKOD TARAMA - Tüm boyutlar için optimize
+            // Büyük tarama alanı: ince, dar, geniş ve büyük barkodlar için
+            const scanBoxWidth = Math.min(window.innerWidth * 0.85, 350);  // Ekranın %85'i veya max 350px
+            const scanBoxHeight = Math.min(window.innerHeight * 0.25, 180); // Yüksek: büyük barkodlar için
+
             const turboConfig = {
-                fps: isIOS ? 30 : 20, // iOS için maksimum FPS
-                qrbox: isIOS ? { width: 280, height: 120 } : { width: 250, height: 100 },
-                aspectRatio: isIOS ? 1.7777 : 1.5, // 16:9 iOS için daha iyi
+                fps: isIOS ? 30 : 25, // Yüksek FPS hızlı algılama için
+                // GENİŞ TARAMA ALANI - tüm barkod boyutları
+                qrbox: {
+                    width: Math.floor(scanBoxWidth),
+                    height: Math.floor(scanBoxHeight)
+                },
+                aspectRatio: 16 / 9, // Full HD oran
                 disableFlip: false,
-                // Sadece barkod formatları - QR kod hariç (çok daha hızlı tarama!)
+                // TÜM BARKOD FORMATLARI - maksimum uyumluluk
                 formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.CODE_93,
-                    Html5QrcodeSupportedFormats.CODABAR,
-                    Html5QrcodeSupportedFormats.ITF
+                    // Standart ürün barkodları
+                    Html5QrcodeSupportedFormats.EAN_13,      // En yaygın (Türkiye: 869)
+                    Html5QrcodeSupportedFormats.EAN_8,       // Küçük ürünler
+                    Html5QrcodeSupportedFormats.UPC_A,       // ABD ürünleri
+                    Html5QrcodeSupportedFormats.UPC_E,       // Küçük ABD ürünleri
+                    // Endüstriyel barkodlar
+                    Html5QrcodeSupportedFormats.CODE_128,    // Lojistik, kargo
+                    Html5QrcodeSupportedFormats.CODE_39,     // Üretim, envanter
+                    Html5QrcodeSupportedFormats.CODE_93,     // Posta, lojistik
+                    Html5QrcodeSupportedFormats.CODABAR,     // Kütüphane, kan bankası
+                    Html5QrcodeSupportedFormats.ITF,         // Koli, palet
+                    // 2D Barkodlar (büyük veri kapasitesi)
+                    Html5QrcodeSupportedFormats.DATA_MATRIX, // Küçük parçalar, ilaç
+                    Html5QrcodeSupportedFormats.PDF_417,     // Kimlik, ehliyet
+                    Html5QrcodeSupportedFormats.AZTEC,       // Bilet, biniş kartı
+                    // QR Kodlar da dahil
+                    Html5QrcodeSupportedFormats.QR_CODE      // QR kodlar
                 ]
             };
 
@@ -244,16 +266,20 @@ class BarcodeStockApp {
                     this.html5QrcodeScanner = new Html5Qrcode("reader");
                 }
 
-                // Basit fallback config
+                // Gelişmiş fallback config - geniş tarama alanı
                 await this.html5QrcodeScanner.start(
                     { facingMode: "environment" },
                     {
-                        fps: 15,
-                        qrbox: { width: 250, height: 100 },
+                        fps: 20,
+                        qrbox: { width: 300, height: 150 }, // Daha geniş alan
                         formatsToSupport: [
                             Html5QrcodeSupportedFormats.EAN_13,
                             Html5QrcodeSupportedFormats.EAN_8,
-                            Html5QrcodeSupportedFormats.CODE_128
+                            Html5QrcodeSupportedFormats.UPC_A,
+                            Html5QrcodeSupportedFormats.CODE_128,
+                            Html5QrcodeSupportedFormats.CODE_39,
+                            Html5QrcodeSupportedFormats.ITF,
+                            Html5QrcodeSupportedFormats.QR_CODE
                         ]
                     },
                     (decodedText) => this.onScanSuccess(decodedText),
