@@ -120,23 +120,33 @@
             <!-- Okuma Modu Seçimi -->
             <div class="scan-mode-control">
                 <div class="scan-mode-header">
-                    <span class="scan-mode-label">📱 Tarayıcı Seçimi</span>
+                    <span class="scan-mode-label">⚡ Tarama Hızı</span>
                     <span class="scan-mode-device" id="device-type">Cihaz algılanıyor...</span>
                 </div>
                 <div class="scan-mode-buttons">
-                    <button class="scan-mode-btn active" data-mode="standard" data-scanner="html5" id="mode-standard">
-                        <span class="mode-icon">📷</span>
-                        <span class="mode-name">Standart</span>
-                        <span class="mode-desc">QR + Barkod</span>
+                    <button class="scan-mode-btn" data-mode="turbo" id="mode-turbo">
+                        <span class="mode-icon">🚀</span>
+                        <span class="mode-name">Turbo</span>
+                        <span class="mode-desc">En hızlı</span>
                     </button>
-                    <button class="scan-mode-btn" data-mode="msi" data-scanner="quagga" id="mode-msi">
+                    <button class="scan-mode-btn active" data-mode="optimize" id="mode-optimize">
+                        <span class="mode-icon">⚡</span>
+                        <span class="mode-name">Optimize</span>
+                        <span class="mode-desc">Önerilen</span>
+                    </button>
+                    <button class="scan-mode-btn" data-mode="standart" id="mode-standart">
+                        <span class="mode-icon">🎯</span>
+                        <span class="mode-name">Standart</span>
+                        <span class="mode-desc">Hassas</span>
+                    </button>
+                    <button class="scan-mode-btn" data-mode="msi" id="mode-msi">
                         <span class="mode-icon">🏭</span>
-                        <span class="mode-name">MSI Mod</span>
-                        <span class="mode-desc">MSI + Codabar</span>
+                        <span class="mode-name">MSI</span>
+                        <span class="mode-desc">Endüstriyel</span>
                     </button>
                 </div>
                 <div class="scan-mode-info" id="scan-mode-info">
-                    📷 Standart mod - QR, EAN, UPC, CODE-128, ITF destekli
+                    ⚡ Optimize mod - Hız ve doğruluk dengesi (Önerilen)
                 </div>
             </div>
 

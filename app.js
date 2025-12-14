@@ -111,8 +111,8 @@ class BarcodeStockApp {
             }
         }
 
-        // Kaydedilmiş modu yükle veya varsayılan olarak "standard" kullan
-        const savedMode = localStorage.getItem('barcode_scan_mode') || 'standard';
+        // Kaydedilmiş modu yükle veya varsayılan olarak "optimize" kullan
+        const savedMode = localStorage.getItem('barcode_scan_mode') || 'optimize';
         this.setScanMode(savedMode);
     }
 
@@ -205,15 +205,24 @@ class BarcodeStockApp {
     setScanMode(mode) {
         this.currentScanMode = mode;
 
-        // Tarayıcı tipini belirle
+        // Tarayıcı tipini belirle (MSI için QuaggaJS, diğerleri için Html5Qrcode)
         if (mode === 'msi') {
             this.currentScanner = 'quagga';
         } else {
             this.currentScanner = 'html5';
         }
 
-        // Cooldown ayarla
-        this.scanCooldown = mode === 'msi' ? 400 : 300;
+        // FPS ve Cooldown ayarları moda göre
+        const modeSettings = {
+            turbo: { fps: 30, cooldown: 200, info: '🚀 Turbo mod - Maksimum hız, sürekli tarama' },
+            optimize: { fps: 25, cooldown: 300, info: '⚡ Optimize mod - Hız ve doğruluk dengesi (Önerilen)' },
+            standart: { fps: 15, cooldown: 500, info: '🎯 Standart mod - En hassas okuma, düşük pil tüketimi' },
+            msi: { fps: 15, cooldown: 400, info: '🏭 MSI mod - MSI, Codabar, I2of5, Code-39/93/128 destekli' }
+        };
+
+        const settings = modeSettings[mode] || modeSettings.optimize;
+        this.currentModeConfig = { fps: settings.fps };
+        this.scanCooldown = settings.cooldown;
 
         // UI güncelle
         document.querySelectorAll('.scan-mode-btn').forEach(btn => {
@@ -226,17 +235,13 @@ class BarcodeStockApp {
         // Info güncelle
         const infoEl = document.getElementById('scan-mode-info');
         if (infoEl) {
-            if (mode === 'msi') {
-                infoEl.textContent = '🏭 MSI Mod - MSI, Codabar, I2of5, Code-39/93/128 destekli';
-            } else {
-                infoEl.textContent = '📷 Standart mod - QR, EAN, UPC, CODE-128, ITF, DataMatrix destekli';
-            }
+            infoEl.textContent = settings.info;
         }
 
         // Kaydet
         localStorage.setItem('barcode_scan_mode', mode);
 
-        console.log(`📱 Scanner: ${this.currentScanner} | Mode: ${mode} | Cooldown: ${this.scanCooldown}ms`);
+        console.log(`📱 Mode: ${mode} | Scanner: ${this.currentScanner} | FPS: ${settings.fps} | Cooldown: ${this.scanCooldown}ms`);
 
         // Eğer tarama aktifse, yeniden başlat
         if (this.isScanning) {
