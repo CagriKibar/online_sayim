@@ -9,7 +9,9 @@ class BarcodeStockApp {
         this.isScanning = false;
         this.editingProduct = null;
         this.lastScanTime = 0;
-        this.scanCooldown = 350; // ⚡ TURBO: Çok hızlı ardışık tarama
+        this.baseCooldown = 350; // Temel cooldown (ms)
+        this.scanCooldown = 350; // Aktif cooldown
+        this.scanSpeed = 100; // Tarama hızı yüzdesi (25-100)
 
         this.init();
     }
@@ -71,6 +73,68 @@ class BarcodeStockApp {
         document.getElementById('edit-increase').addEventListener('click', () => this.adjustEditQuantity(1));
         document.getElementById('edit-decrease').addEventListener('click', () => this.adjustEditQuantity(-1));
         document.querySelector('#edit-modal .modal-backdrop').addEventListener('click', () => this.hideEditModal());
+
+        // Speed slider
+        const speedSlider = document.getElementById('speed-slider');
+        if (speedSlider) {
+            speedSlider.addEventListener('input', (e) => this.updateScanSpeed(e.target.value));
+            // Load saved speed
+            const savedSpeed = localStorage.getItem('barcode_scan_speed');
+            if (savedSpeed) {
+                speedSlider.value = savedSpeed;
+                this.updateScanSpeed(savedSpeed);
+            }
+        }
+    }
+
+    // =============================================
+    // SPEED CONTROL
+    // =============================================
+
+    updateScanSpeed(value) {
+        this.scanSpeed = parseInt(value);
+
+        // Cooldown hesapla: Düşük hız = yüksek cooldown, Yüksek hız = düşük cooldown
+        // 100% = 200ms, 25% = 1200ms
+        this.scanCooldown = Math.round(this.baseCooldown + (100 - this.scanSpeed) * 10);
+
+        // UI güncelle
+        const speedValue = document.getElementById('speed-value');
+        const speedHint = document.getElementById('speed-hint');
+        const speedControl = document.querySelector('.speed-control');
+        const speedSlider = document.getElementById('speed-slider');
+
+        if (speedValue) speedValue.textContent = `${this.scanSpeed}%`;
+
+        // Slider gradient güncelle
+        if (speedSlider) {
+            const percent = ((this.scanSpeed - 25) / 75) * 100;
+            speedSlider.style.setProperty('--speed-percent', `${percent}%`);
+        }
+
+        // Seviye ve hint güncelle
+        let level, hint;
+        if (this.scanSpeed <= 40) {
+            level = 'slow';
+            hint = 'Yavaş mod - dikkatli okuma, pil tasarrufu';
+        } else if (this.scanSpeed <= 60) {
+            level = 'medium';
+            hint = 'Orta hız - dengeli performans';
+        } else if (this.scanSpeed <= 85) {
+            level = 'fast';
+            hint = 'Hızlı mod - çoğu durum için ideal';
+        } else {
+            level = 'turbo';
+            hint = 'Turbo mod - maksimum hız 🚀';
+        }
+
+        if (speedControl) speedControl.setAttribute('data-level', level);
+        if (speedHint) speedHint.textContent = hint;
+
+        // Kaydet
+        localStorage.setItem('barcode_scan_speed', this.scanSpeed);
+
+        console.log(`⚡ Tarama hızı: ${this.scanSpeed}% | Cooldown: ${this.scanCooldown}ms`);
     }
 
     // =============================================
