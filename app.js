@@ -94,6 +94,9 @@ class BarcodeStockApp {
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         this.isAndroid = /Android/.test(navigator.userAgent);
 
+        // Varsayılan tarayıcı: standard (Html5Qrcode)
+        this.currentScanner = 'html5'; // 'html5' veya 'quagga'
+
         // Cihaz tipini göster
         const deviceEl = document.getElementById('device-type');
         if (deviceEl) {
@@ -108,8 +111,8 @@ class BarcodeStockApp {
             }
         }
 
-        // Kaydedilmiş modu yükle veya varsayılan olarak "optimize" kullan
-        const savedMode = localStorage.getItem('barcode_scan_mode') || 'optimize';
+        // Kaydedilmiş modu yükle veya varsayılan olarak "standard" kullan
+        const savedMode = localStorage.getItem('barcode_scan_mode') || 'standard';
         this.setScanMode(savedMode);
     }
 
@@ -201,11 +204,16 @@ class BarcodeStockApp {
 
     setScanMode(mode) {
         this.currentScanMode = mode;
-        const config = this.getScanModeConfig(mode);
 
-        // Cooldown'u güncelle
-        this.scanCooldown = config.cooldown;
-        this.currentModeConfig = config;
+        // Tarayıcı tipini belirle
+        if (mode === 'msi') {
+            this.currentScanner = 'quagga';
+        } else {
+            this.currentScanner = 'html5';
+        }
+
+        // Cooldown ayarla
+        this.scanCooldown = mode === 'msi' ? 400 : 300;
 
         // UI güncelle
         document.querySelectorAll('.scan-mode-btn').forEach(btn => {
@@ -218,13 +226,17 @@ class BarcodeStockApp {
         // Info güncelle
         const infoEl = document.getElementById('scan-mode-info');
         if (infoEl) {
-            infoEl.textContent = config.info;
+            if (mode === 'msi') {
+                infoEl.textContent = '🏭 MSI Mod - MSI, Codabar, I2of5, Code-39/93/128 destekli';
+            } else {
+                infoEl.textContent = '📷 Standart mod - QR, EAN, UPC, CODE-128, ITF, DataMatrix destekli';
+            }
         }
 
         // Kaydet
         localStorage.setItem('barcode_scan_mode', mode);
 
-        console.log(`📱 Mod: ${mode} | FPS: ${config.fps} | Cooldown: ${config.cooldown}ms | Platform: ${this.isIOS ? 'iOS' : this.isAndroid ? 'Android' : 'Desktop'}`);
+        console.log(`📱 Scanner: ${this.currentScanner} | Mode: ${mode} | Cooldown: ${this.scanCooldown}ms`);
 
         // Eğer tarama aktifse, yeniden başlat
         if (this.isScanning) {
@@ -235,6 +247,18 @@ class BarcodeStockApp {
     async restartScanning() {
         await this.stopScanning();
         setTimeout(() => this.startScanning(), 300);
+    }
+
+    async stopAllScanners() {
+        // Html5Qrcode'u durdur
+        if (this.html5QrcodeScanner) {
+            try {
+                await this.html5QrcodeScanner.stop();
+            } catch (e) { }
+            this.html5QrcodeScanner = null;
+        }
+        // QuaggaJS'i durdur
+        this.stopQuaggaScanner();
     }
 
     // =============================================
@@ -330,21 +354,26 @@ class BarcodeStockApp {
         document.getElementById('start-scan-btn').classList.add('hidden');
         document.getElementById('stop-scan-btn').classList.remove('hidden');
 
-        try {
-            // Önceki scanner'ı temizle
-            if (this.html5QrcodeScanner) {
-                try {
-                    await this.html5QrcodeScanner.stop();
-                } catch (e) { }
-                this.html5QrcodeScanner = null;
-            }
+        // Önceki scanner'ları temizle
+        await this.stopAllScanners();
 
+        // MSI Mod için QuaggaJS kullan
+        if (this.currentScanner === 'quagga') {
+            console.log('🏭 QuaggaJS başlatılıyor - MSI Mod');
+            this.startQuaggaScanner();
+            this.isScanning = true;
+            this.showToast('success', '🏭 MSI Mod Aktif', 'MSI, Codabar, I2of5 barkodları okunabilir');
+            return;
+        }
+
+        // Standart mod için Html5Qrcode kullan
+        try {
             // iOS/Apple cihaz tespiti
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-            console.log('iOS Cihaz:', isIOS, 'Safari:', isSafari);
+            console.log('📷 Html5Qrcode başlatılıyor - Standart Mod');
 
             // Kamera erişimi kontrolü
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -601,6 +630,7 @@ class BarcodeStockApp {
     }
 
     async stopScanning() {
+        // Html5Qrcode'u durdur
         if (this.html5QrcodeScanner && this.isScanning) {
             try {
                 await this.html5QrcodeScanner.stop();
@@ -608,6 +638,9 @@ class BarcodeStockApp {
                 console.error('Stop error:', err);
             }
         }
+
+        // QuaggaJS'i durdur
+        this.stopQuaggaScanner();
 
         this.isScanning = false;
         document.getElementById('scanner-container').classList.remove('active');

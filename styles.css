@@ -454,7 +454,8 @@ body::before {
 
 .scan-mode-buttons {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
+    /* 2 buton için */
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-sm);
 }
@@ -493,40 +494,27 @@ body::before {
 }
 
 /* Active states for each mode */
-.scan-mode-btn.active[data-mode="turbo"] {
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
-    border-color: #764ba2;
-    box-shadow: 0 0 20px rgba(118, 75, 162, 0.3);
-}
-
-.scan-mode-btn.active[data-mode="turbo"] .mode-name {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.scan-mode-btn.active[data-mode="optimize"] {
-    background: linear-gradient(135deg, rgba(0, 184, 148, 0.2), rgba(0, 206, 201, 0.2));
-    border-color: #00b894;
-    box-shadow: 0 0 20px rgba(0, 184, 148, 0.3);
-}
-
-.scan-mode-btn.active[data-mode="optimize"] .mode-name {
-    background: linear-gradient(135deg, #00b894, #00cec9);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.scan-mode-btn.active[data-mode="standart"] {
+.scan-mode-btn.active[data-mode="standard"] {
     background: linear-gradient(135deg, rgba(9, 132, 227, 0.2), rgba(116, 185, 255, 0.2));
     border-color: #0984e3;
     box-shadow: 0 0 20px rgba(9, 132, 227, 0.3);
 }
 
-.scan-mode-btn.active[data-mode="standart"] .mode-name {
+.scan-mode-btn.active[data-mode="standard"] .mode-name {
     background: linear-gradient(135deg, #0984e3, #74b9ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.scan-mode-btn.active[data-mode="msi"] {
+    background: linear-gradient(135deg, rgba(230, 126, 34, 0.2), rgba(211, 84, 0, 0.2));
+    border-color: #e67e22;
+    box-shadow: 0 0 20px rgba(230, 126, 34, 0.3);
+}
+
+.scan-mode-btn.active[data-mode="msi"] .mode-name {
+    background: linear-gradient(135deg, #e67e22, #d35400);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
