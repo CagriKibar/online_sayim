@@ -648,9 +648,7 @@ class BarcodeStockApp {
             'Sıra': i + 1,
             'Barkod': p.barcode,
             'Ürün Adı': p.name || '-',
-            'Adet': p.quantity,
-            'İlk Okuma': new Date(p.firstScan).toLocaleString('tr-TR'),
-            'Son Okuma': new Date(p.lastScan).toLocaleString('tr-TR')
+            'Adet': p.quantity
         }));
 
         // Add summary row
@@ -659,9 +657,7 @@ class BarcodeStockApp {
             'Sıra': '',
             'Barkod': 'TOPLAM',
             'Ürün Adı': `${this.products.length} çeşit ürün`,
-            'Adet': this.products.reduce((sum, p) => sum + p.quantity, 0),
-            'İlk Okuma': '',
-            'Son Okuma': ''
+            'Adet': this.products.reduce((sum, p) => sum + p.quantity, 0)
         });
 
         const ws = XLSX.utils.json_to_sheet(data);
@@ -672,9 +668,7 @@ class BarcodeStockApp {
             { wch: 6 },
             { wch: 20 },
             { wch: 25 },
-            { wch: 8 },
-            { wch: 20 },
-            { wch: 20 }
+            { wch: 8 }
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, 'Stok Sayım');
