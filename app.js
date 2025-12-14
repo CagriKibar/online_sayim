@@ -338,21 +338,22 @@ class BarcodeStockApp {
             // Mod config'inden değerleri al
             const modeConfig = this.currentModeConfig || this.getScanModeConfig('optimize');
 
-            // Tarama alanı - mod'a göre ayarla
-            const scanBoxSize = Math.min(
-                window.innerWidth * 0.80,
-                window.innerHeight * 0.35,
-                modeConfig.qrbox || 300
+            // Tarama alanı - GENİŞ DİKDÖRTGEN (yatay barkodlar için ideal)
+            const scanBoxWidth = Math.min(
+                window.innerWidth * 0.90,  // Ekranın %90'ı
+                400                         // Max 400px
             );
+            const scanBoxHeight = Math.floor(scanBoxWidth * 0.45); // Yükseklik = genişliğin %45'i
 
             const scanConfig = {
                 fps: modeConfig.fps, // Mod'a göre FPS
-                // 🔲 KARE TARAMA ALANI - TÜM YÖNLER İÇİN
+                // � GENİŞ DİKDÖRTGEN TARAMA ALANI
+                // Yatay barkodlar (ITF, CODE-128, EAN-13) için optimize
                 qrbox: {
-                    width: Math.floor(scanBoxSize),
-                    height: Math.floor(scanBoxSize)
+                    width: Math.floor(scanBoxWidth),
+                    height: scanBoxHeight
                 },
-                aspectRatio: 1.0,
+                aspectRatio: 16 / 9, // Geniş ekran oranı
                 disableFlip: false,
                 // TÜM BARKOD FORMATLARI - maksimum uyumluluk
                 formatsToSupport: [
@@ -361,12 +362,12 @@ class BarcodeStockApp {
                     Html5QrcodeSupportedFormats.EAN_8,
                     Html5QrcodeSupportedFormats.UPC_A,
                     Html5QrcodeSupportedFormats.UPC_E,
-                    // Endüstriyel barkodlar
+                    // Endüstriyel barkodlar (GENİŞ)
                     Html5QrcodeSupportedFormats.CODE_128,
                     Html5QrcodeSupportedFormats.CODE_39,
                     Html5QrcodeSupportedFormats.CODE_93,
                     Html5QrcodeSupportedFormats.CODABAR,
-                    Html5QrcodeSupportedFormats.ITF,
+                    Html5QrcodeSupportedFormats.ITF,  // Koli barkodları
                     // 2D Barkodlar
                     Html5QrcodeSupportedFormats.DATA_MATRIX,
                     Html5QrcodeSupportedFormats.PDF_417,
@@ -376,15 +377,15 @@ class BarcodeStockApp {
                 ]
             };
 
-            console.log(`🎯 Tarama başlıyor - Mod: ${this.currentScanMode} | FPS: ${scanConfig.fps} | Cooldown: ${this.scanCooldown}ms`);
+            console.log(`🎯 Tarama başlıyor - Mod: ${this.currentScanMode} | FPS: ${scanConfig.fps} | Kutu: ${scanBoxWidth}x${scanBoxHeight}px`);
 
             // iOS için direkt facingMode kullan (kamera listesi yerine)
             if (isIOS) {
-                console.log('🍎 iOS Turbo Mod Aktif');
+                console.log('🍎 iOS Mod Aktif');
 
                 await this.html5QrcodeScanner.start(
                     { facingMode: "environment" },
-                    turboConfig,
+                    scanConfig,
                     (decodedText) => this.onScanSuccess(decodedText),
                     () => { } // Hata callback'i boş - performans için
                 );
