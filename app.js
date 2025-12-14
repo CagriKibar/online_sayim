@@ -338,14 +338,36 @@ class BarcodeStockApp {
             // Mod config'inden değerleri al
             const modeConfig = this.currentModeConfig || this.getScanModeConfig('optimize');
 
-            // 🔥 FULL SCREEN TARAMA - Tüm ekranı tara, kısıtlama YOK
+            // 🔥 FULL SCREEN TARAMA - Tüm ekranı tara
             const scanConfig = {
                 fps: modeConfig.fps,
-                // qrbox KALDIRILDI - TÜM KAMERA ALANINI TARA
-                // Bu sayede herhangi bir barkod, herhangi bir konumda okunabilir
                 aspectRatio: 16 / 9,
-                disableFlip: false
-                // formatsToSupport KALDIRILDI - TÜM FORMATLARI OTOMATİK ALGILAR
+                disableFlip: false,
+                // TÜM DESTEKLENEN FORMATLAR - Html5Qrcode'un desteklediği her format
+                formatsToSupport: [
+                    // Ürün barkodları
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+                    // Endüstriyel 1D barkodlar
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.CODE_93,
+                    Html5QrcodeSupportedFormats.CODABAR,  // ✅ Codabar aktif
+                    Html5QrcodeSupportedFormats.ITF,
+                    // GS1 DataBar (RSS)
+                    Html5QrcodeSupportedFormats.RSS_14,
+                    Html5QrcodeSupportedFormats.RSS_EXPANDED,
+                    // 2D Barkodlar
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.DATA_MATRIX,
+                    Html5QrcodeSupportedFormats.PDF_417,
+                    Html5QrcodeSupportedFormats.AZTEC,
+                    Html5QrcodeSupportedFormats.MAXICODE
+                ]
+                // ⚠️ NOT: MSI ve Pharmacode bu kütüphane tarafından DESTEKLENMİYOR
             };
 
             console.log(`🔥 FULL SCREEN Tarama - Mod: ${this.currentScanMode} | FPS: ${scanConfig.fps} | Tüm formatlar aktif`);
