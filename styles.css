@@ -331,13 +331,11 @@ body::before {
 
 .scanner-frame {
     position: relative;
-    width: 90%;
-    aspect-ratio: 2.5/1;
-    /* Daha geniş: büyük barkodlar için */
-    max-width: 380px;
-    /* Artırıldı */
-    min-height: 120px;
-    /* Minimum yükseklik */
+    width: 85%;
+    aspect-ratio: 1/1;
+    /* KARE: yatay, dikey, çapraz, oval barkodlar için */
+    max-width: 320px;
+    max-height: 320px;
 }
 
 .corner {

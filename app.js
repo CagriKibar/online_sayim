@@ -171,39 +171,44 @@ class BarcodeStockApp {
                 verbose: false
             });
 
-            // 🎯 PRO BARKOD TARAMA - Tüm boyutlar için optimize
-            // Büyük tarama alanı: ince, dar, geniş ve büyük barkodlar için
-            const scanBoxWidth = Math.min(window.innerWidth * 0.85, 350);  // Ekranın %85'i veya max 350px
-            const scanBoxHeight = Math.min(window.innerHeight * 0.25, 180); // Yüksek: büyük barkodlar için
+            // 🔄 360° BARKOD TARAMA - Tüm yönler için optimize
+            // KARE tarama alanı: yatay, dikey, çapraz ve oval barkodlar için
+            const scanBoxSize = Math.min(
+                window.innerWidth * 0.80,   // Ekran genişliğinin %80'i
+                window.innerHeight * 0.35,  // Ekran yüksekliğinin %35'i
+                320                          // Maksimum 320px
+            );
 
             const turboConfig = {
                 fps: isIOS ? 30 : 25, // Yüksek FPS hızlı algılama için
-                // GENİŞ TARAMA ALANI - tüm barkod boyutları
+                // 🔲 KARE TARAMA ALANI - TÜM YÖNLER İÇİN
+                // Kare alan hem yatay hem dikey barkodları yakalar
                 qrbox: {
-                    width: Math.floor(scanBoxWidth),
-                    height: Math.floor(scanBoxHeight)
+                    width: Math.floor(scanBoxSize),
+                    height: Math.floor(scanBoxSize)  // Kare: width = height
                 },
-                aspectRatio: 16 / 9, // Full HD oran
-                disableFlip: false,
+                aspectRatio: 1.0, // 1:1 kare oran - tüm yönler için ideal
+                disableFlip: false, // Ayna görüntü desteği
                 // TÜM BARKOD FORMATLARI - maksimum uyumluluk
                 formatsToSupport: [
-                    // Standart ürün barkodları
+                    // Standart ürün barkodları (genelde yatay)
                     Html5QrcodeSupportedFormats.EAN_13,      // En yaygın (Türkiye: 869)
                     Html5QrcodeSupportedFormats.EAN_8,       // Küçük ürünler
                     Html5QrcodeSupportedFormats.UPC_A,       // ABD ürünleri
                     Html5QrcodeSupportedFormats.UPC_E,       // Küçük ABD ürünleri
-                    // Endüstriyel barkodlar
+                    // Endüstriyel barkodlar (yatay veya dikey olabilir)
                     Html5QrcodeSupportedFormats.CODE_128,    // Lojistik, kargo
                     Html5QrcodeSupportedFormats.CODE_39,     // Üretim, envanter
                     Html5QrcodeSupportedFormats.CODE_93,     // Posta, lojistik
                     Html5QrcodeSupportedFormats.CODABAR,     // Kütüphane, kan bankası
                     Html5QrcodeSupportedFormats.ITF,         // Koli, palet
-                    // 2D Barkodlar (büyük veri kapasitesi)
+                    // 2D Barkodlar (yön bağımsız - oval, kare vb.)
                     Html5QrcodeSupportedFormats.DATA_MATRIX, // Küçük parçalar, ilaç
-                    Html5QrcodeSupportedFormats.PDF_417,     // Kimlik, ehliyet
-                    Html5QrcodeSupportedFormats.AZTEC,       // Bilet, biniş kartı
-                    // QR Kodlar da dahil
-                    Html5QrcodeSupportedFormats.QR_CODE      // QR kodlar
+                    Html5QrcodeSupportedFormats.PDF_417,     // Kimlik, ehliyet (dikdörtgen)
+                    Html5QrcodeSupportedFormats.AZTEC,       // Bilet, biniş kartı (kare)
+                    Html5QrcodeSupportedFormats.QR_CODE,     // QR kodlar (kare)
+                    // Ek formatlar
+                    Html5QrcodeSupportedFormats.MAXICODE     // Kargo, UPS (altıgen/oval)
                 ]
             };
 
