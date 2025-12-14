@@ -427,6 +427,78 @@ body::before {
 }
 
 /* =============================================
+   iOS TURBO SCANNING OPTIMIZATIONS
+   ============================================= */
+/* iOS için GPU-accelerated tarama */
+@supports (-webkit-touch-callout: none) {
+    .scanner-container {
+        /* iOS GPU hızlandırma */
+        -webkit-transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        -webkit-perspective: 1000px;
+        perspective: 1000px;
+        /* Rendering optimizasyonu */
+        will-change: transform;
+        contain: layout style paint;
+    }
+
+    .reader {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        will-change: contents;
+    }
+
+    .reader video {
+        /* iOS video optimizasyonu */
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        /* Daha hızlı rendering */
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+
+    /* Tarama çizgisi iOS için daha hızlı animasyon */
+    .scan-line {
+        animation: scan 1s ease-in-out infinite;
+    }
+}
+
+/* iOS Turbo mod göstergesi */
+.scanner-container.turbo-mode::after {
+    content: '⚡ TURBO';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: linear-gradient(135deg, #f5af19 0%, #f12711 100%);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    z-index: 10;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+
+/* =============================================
    MANUAL ENTRY
    ============================================= */
 .manual-entry {

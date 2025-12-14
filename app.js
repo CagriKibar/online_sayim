@@ -9,7 +9,7 @@ class BarcodeStockApp {
         this.isScanning = false;
         this.editingProduct = null;
         this.lastScanTime = 0;
-        this.scanCooldown = 800; // Hızlı ardışık tarama için optimize edildi
+        this.scanCooldown = 350; // ⚡ TURBO: Çok hızlı ardışık tarama
 
         this.init();
     }
@@ -93,78 +93,169 @@ class BarcodeStockApp {
                 this.html5QrcodeScanner = null;
             }
 
+            // iOS/Apple cihaz tespiti
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+            console.log('iOS Cihaz:', isIOS, 'Safari:', isSafari);
+
             // Kamera erişimi kontrolü
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 throw new Error('Bu tarayıcı kamera erişimini desteklemiyor');
             }
 
-            // Önce kamera izni al
+            // iOS için özel kamera constraint'leri - YÜKSEK PERFORMANS
+            const videoConstraints = isIOS ? {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280, max: 1920 },
+                height: { ideal: 720, max: 1080 },
+                frameRate: { ideal: 60, min: 30 },
+                // iOS için kritik optimizasyonlar
+                advanced: [
+                    { focusMode: 'continuous' },
+                    { exposureMode: 'continuous' },
+                    { whiteBalanceMode: 'continuous' }
+                ]
+            } : {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30, min: 15 }
+            };
+
+            // Önce kamera izni al ve iOS için stream'i hazırla
+            let testStream;
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                stream.getTracks().forEach(track => track.stop());
+                testStream = await navigator.mediaDevices.getUserMedia({
+                    video: videoConstraints,
+                    audio: false
+                });
+
+                // iOS için: Stream'i hemen kapatma, önce track ayarlarını kontrol et
+                const videoTrack = testStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+                    const settings = videoTrack.getSettings();
+                    console.log('Kamera özellikleri:', capabilities);
+                    console.log('Kamera ayarları:', settings);
+
+                    // iOS için otomatik odaklama ve pozlama
+                    if (videoTrack.applyConstraints) {
+                        try {
+                            await videoTrack.applyConstraints({
+                                advanced: [{ focusMode: 'continuous' }]
+                            });
+                        } catch (e) {
+                            console.log('Odaklama ayarı uygulanamadı:', e);
+                        }
+                    }
+                }
+
+                testStream.getTracks().forEach(track => track.stop());
             } catch (permErr) {
                 throw new Error('Kamera izni verilmedi');
             }
 
-            this.html5QrcodeScanner = new Html5Qrcode("reader");
+            this.html5QrcodeScanner = new Html5Qrcode("reader", {
+                // iOS için gelişmiş ayarlar
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true // Native BarcodeDetector API kullan (çok daha hızlı!)
+                },
+                verbose: false
+            });
 
-            // Mevcut kameraları listele
-            const cameras = await Html5Qrcode.getCameras();
-            console.log('Bulunan kameralar:', cameras);
-
-            if (!cameras || cameras.length === 0) {
-                throw new Error('Kamera bulunamadı');
-            }
-
-            // Arka kamerayı bul (varsa)
-            let cameraId = cameras[0].id;
-            for (const camera of cameras) {
-                if (camera.label.toLowerCase().includes('back') ||
-                    camera.label.toLowerCase().includes('arka') ||
-                    camera.label.toLowerCase().includes('rear') ||
-                    camera.label.toLowerCase().includes('environment')) {
-                    cameraId = camera.id;
-                    break;
-                }
-            }
-
-            // Eğer birden fazla kamera varsa sonuncuyu kullan (genelde arka kamera)
-            if (cameras.length > 1) {
-                cameraId = cameras[cameras.length - 1].id;
-            }
-
-            console.log('Seçilen kamera:', cameraId);
-
-            const config = {
-                fps: 10,
-                qrbox: { width: 250, height: 100 },
-                aspectRatio: 1.5
+            // ⚡ iOS İÇİN TURBO HIZLI KONFIGÜRASYON ⚡
+            const turboConfig = {
+                fps: isIOS ? 30 : 20, // iOS için maksimum FPS
+                qrbox: isIOS ? { width: 280, height: 120 } : { width: 250, height: 100 },
+                aspectRatio: isIOS ? 1.7777 : 1.5, // 16:9 iOS için daha iyi
+                disableFlip: false,
+                // Sadece barkod formatları - QR kod hariç (çok daha hızlı tarama!)
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.CODE_93,
+                    Html5QrcodeSupportedFormats.CODABAR,
+                    Html5QrcodeSupportedFormats.ITF
+                ]
             };
 
-            await this.html5QrcodeScanner.start(
-                cameraId,
-                config,
-                (decodedText) => this.onScanSuccess(decodedText),
-                () => { }
-            );
+            // iOS için direkt facingMode kullan (kamera listesi yerine)
+            if (isIOS) {
+                console.log('🍎 iOS Turbo Mod Aktif');
+
+                await this.html5QrcodeScanner.start(
+                    { facingMode: "environment" },
+                    turboConfig,
+                    (decodedText) => this.onScanSuccess(decodedText),
+                    () => { } // Hata callback'i boş - performans için
+                );
+            } else {
+                // Android/Desktop için kamera listesi
+                const cameras = await Html5Qrcode.getCameras();
+                console.log('Bulunan kameralar:', cameras);
+
+                if (!cameras || cameras.length === 0) {
+                    throw new Error('Kamera bulunamadı');
+                }
+
+                // Arka kamerayı bul
+                let cameraId = cameras[cameras.length - 1].id; // Varsayılan: son kamera
+                for (const camera of cameras) {
+                    const label = camera.label.toLowerCase();
+                    if (label.includes('back') || label.includes('arka') ||
+                        label.includes('rear') || label.includes('environment') ||
+                        label.includes('wide') || label.includes('main')) {
+                        cameraId = camera.id;
+                        break;
+                    }
+                }
+
+                console.log('Seçilen kamera:', cameraId);
+
+                await this.html5QrcodeScanner.start(
+                    cameraId,
+                    turboConfig,
+                    (decodedText) => this.onScanSuccess(decodedText),
+                    () => { }
+                );
+            }
 
             this.isScanning = true;
-            this.showToast('success', 'Kamera Açıldı', 'Barkodu tarama alanına getirin');
+
+            // iOS için ek optimizasyonlar: Tarama alanını highlighting
+            this.optimizeScannerDOM();
+
+            this.showToast('success', '⚡ Turbo Mod', isIOS ? 'iOS optimizasyonu aktif!' : 'Barkodu tarama alanına getirin');
 
         } catch (err) {
             console.error('Kamera hatası:', err);
 
-            // Alternatif yöntem dene
+            // Alternatif yöntem dene (fallback)
             try {
-                console.log('Alternatif yöntem deneniyor...');
+                console.log('Fallback yöntem deneniyor...');
 
                 if (!this.html5QrcodeScanner) {
                     this.html5QrcodeScanner = new Html5Qrcode("reader");
                 }
 
+                // Basit fallback config
                 await this.html5QrcodeScanner.start(
                     { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 100 } },
+                    {
+                        fps: 15,
+                        qrbox: { width: 250, height: 100 },
+                        formatsToSupport: [
+                            Html5QrcodeSupportedFormats.EAN_13,
+                            Html5QrcodeSupportedFormats.EAN_8,
+                            Html5QrcodeSupportedFormats.CODE_128
+                        ]
+                    },
                     (decodedText) => this.onScanSuccess(decodedText),
                     () => { }
                 );
@@ -176,6 +267,50 @@ class BarcodeStockApp {
                 console.error('Fallback hatası:', fallbackErr);
                 this.showToast('error', 'Kamera Hatası', err.message || 'Kamera başlatılamadı');
                 this.resetScannerUI();
+            }
+        }
+    }
+
+    // iOS için DOM optimizasyonu - rendering performansı
+    optimizeScannerDOM() {
+        const reader = document.getElementById('reader');
+        const container = document.getElementById('scanner-container');
+
+        // iOS tespiti
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+        // Turbo mod göstergesi ekle
+        if (container && isIOS) {
+            container.classList.add('turbo-mode');
+        }
+
+        if (reader) {
+            // Hardware acceleration
+            reader.style.transform = 'translateZ(0)';
+            reader.style.backfaceVisibility = 'hidden';
+            reader.style.perspective = '1000px';
+            reader.style.willChange = 'transform';
+
+            // Video elementi için özel stiller
+            const video = reader.querySelector('video');
+            if (video) {
+                video.style.transform = 'translateZ(0)';
+                video.setAttribute('playsinline', 'true'); // iOS için kritik
+                video.setAttribute('webkit-playsinline', 'true');
+                video.setAttribute('muted', 'true');
+                video.setAttribute('autoplay', 'true');
+
+                // iOS Safari için video optimizasyonu
+                video.style.objectFit = 'cover';
+                video.style.willChange = 'transform';
+
+                // iOS için ek optimizasyonlar
+                if (isIOS) {
+                    // Video kalitesi vs hız dengesi - hız öncelikli
+                    video.style.imageRendering = 'crisp-edges';
+                    video.style.webkitImageRendering = 'optimizeSpeed';
+                }
             }
         }
     }
