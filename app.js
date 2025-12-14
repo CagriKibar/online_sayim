@@ -268,29 +268,35 @@ class BarcodeStockApp {
     startQuaggaScanner() {
         if (typeof Quagga === 'undefined') {
             console.log('QuaggaJS yüklenemedi');
+            this.showToast('error', 'Hata', 'MSI kütüphanesi yüklenemedi');
             return;
         }
 
         const readerElement = document.getElementById('reader');
         if (!readerElement) return;
 
+        // Quagga için video container oluştur
+        readerElement.innerHTML = '<div id="quagga-container" style="width:100%;height:100%;"></div>';
+        const quaggaContainer = document.getElementById('quagga-container');
+
         Quagga.init({
             inputStream: {
                 name: "Live",
                 type: "LiveStream",
-                target: readerElement,
+                target: quaggaContainer,
                 constraints: {
                     facingMode: "environment",
                     width: { min: 640, ideal: 1280, max: 1920 },
-                    height: { min: 480, ideal: 720, max: 1080 }
+                    height: { min: 480, ideal: 720, max: 1080 },
+                    aspectRatio: { min: 1, max: 2 }
                 }
             },
             locator: {
-                patchSize: "medium",
-                halfSample: true
+                patchSize: "large", // Daha büyük = daha iyi algılama
+                halfSample: false   // false = daha hassas
             },
             numOfWorkers: navigator.hardwareConcurrency || 4,
-            frequency: 10,
+            frequency: 15, // Daha sık tarama
             decoder: {
                 readers: [
                     "msi_reader",           // MSI / Modified Plessey
@@ -301,15 +307,18 @@ class BarcodeStockApp {
                     "ean_reader",           // EAN-13, EAN-8
                     "upc_reader",           // UPC-A, UPC-E
                     "code_93_reader"        // Code 93
-                ]
+                ],
+                multiple: false // Tek barkod
             },
-            locate: true
+            locate: true,
+            debug: false
         }, (err) => {
             if (err) {
-                console.log('Quagga başlatılamadı:', err);
+                console.error('Quagga başlatılamadı:', err);
+                this.showToast('error', 'Kamera Hatası', 'MSI modu başlatılamadı');
                 return;
             }
-            console.log('🔍 QuaggaJS aktif - MSI, Codabar, I2of5 desteği');
+            console.log('🏭 QuaggaJS aktif - MSI, Codabar, I2of5 desteği');
             Quagga.start();
             this.quaggaActive = true;
         });
@@ -857,6 +866,67 @@ class BarcodeStockApp {
                 const action = btn.dataset.action;
                 const barcode = btn.dataset.barcode;
                 this.updateProductQuantity(barcode, action === 'increase' ? 1 : -1);
+            });
+        });
+
+        // Swipe to delete özelliği
+        this.bindSwipeToDelete(container);
+    }
+
+    bindSwipeToDelete(container) {
+        container.querySelectorAll('.product-card').forEach(card => {
+            let startX = 0;
+            let currentX = 0;
+            let isDragging = false;
+
+            card.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                isDragging = true;
+                card.style.transition = 'none';
+            }, { passive: true });
+
+            card.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                currentX = e.touches[0].clientX;
+                const diff = currentX - startX;
+
+                // Sadece sola kaydırma
+                if (diff < 0) {
+                    const translateX = Math.max(diff, -120);
+                    card.style.transform = `translateX(${translateX}px)`;
+
+                    // Silme göstergesi
+                    if (translateX < -80) {
+                        card.classList.add('swipe-delete');
+                    } else {
+                        card.classList.remove('swipe-delete');
+                    }
+                }
+            }, { passive: true });
+
+            card.addEventListener('touchend', () => {
+                isDragging = false;
+                card.style.transition = 'transform 0.3s ease';
+
+                const diff = currentX - startX;
+
+                if (diff < -80) {
+                    // Sil
+                    const barcode = card.dataset.barcode;
+                    card.style.transform = 'translateX(-100%)';
+                    card.style.opacity = '0';
+                    setTimeout(() => {
+                        this.deleteProduct(barcode);
+                        this.showToast('info', '🗑️ Silindi', `${barcode} silindi`);
+                    }, 300);
+                } else {
+                    // Geri al
+                    card.style.transform = 'translateX(0)';
+                    card.classList.remove('swipe-delete');
+                }
+
+                startX = 0;
+                currentX = 0;
             });
         });
     }

@@ -740,6 +740,25 @@ body::before {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
+    overflow: hidden;
+    /* Swipe için gerekli */
+}
+
+/* Swipe to delete stili */
+.product-card.swipe-delete {
+    background: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+    border-color: #e74c3c !important;
+}
+
+.product-card.swipe-delete::after {
+    content: '🗑️ Sil';
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
 }
 
 .empty-state {
@@ -766,6 +785,8 @@ body::before {
 }
 
 .product-card {
+    position: relative;
+    /* Swipe delete için gerekli */
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
@@ -780,6 +801,8 @@ body::before {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
+    overflow: hidden;
+    /* Swipe animasyonu için */
 }
 
 @keyframes slideIn {
