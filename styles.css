@@ -410,9 +410,9 @@ body::before {
 }
 
 /* =============================================
-   SPEED CONTROL SLIDER
+   SCAN MODE CONTROL
    ============================================= */
-.speed-control {
+.scan-mode-control {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
@@ -420,115 +420,125 @@ body::before {
     margin: 0 var(--spacing-md) var(--spacing-lg);
 }
 
-.speed-header {
+.scan-mode-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
 }
 
-.speed-label {
-    font-size: 0.85rem;
+.scan-mode-label {
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-primary);
 }
 
-.speed-value {
-    font-size: 1.1rem;
-    font-weight: 800;
-    background: var(--primary-gradient);
+.scan-mode-device {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.scan-mode-device.ios {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.scan-mode-device.android {
+    background: linear-gradient(135deg, #00b894, #00cec9);
+    color: white;
+}
+
+.scan-mode-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.scan-mode-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md) var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    gap: 4px;
+}
+
+.scan-mode-btn:active {
+    transform: scale(0.95);
+}
+
+.scan-mode-btn .mode-icon {
+    font-size: 1.5rem;
+}
+
+.scan-mode-btn .mode-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.scan-mode-btn .mode-desc {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+/* Active states for each mode */
+.scan-mode-btn.active[data-mode="turbo"] {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+    border-color: #764ba2;
+    box-shadow: 0 0 20px rgba(118, 75, 162, 0.3);
+}
+
+.scan-mode-btn.active[data-mode="turbo"] .mode-name {
+    background: linear-gradient(135deg, #667eea, #764ba2);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    min-width: 50px;
-    text-align: right;
 }
 
-.speed-slider-container {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
+.scan-mode-btn.active[data-mode="optimize"] {
+    background: linear-gradient(135deg, rgba(0, 184, 148, 0.2), rgba(0, 206, 201, 0.2));
+    border-color: #00b894;
+    box-shadow: 0 0 20px rgba(0, 184, 148, 0.3);
 }
 
-.speed-min,
-.speed-max {
-    font-size: 1.2rem;
-    opacity: 0.7;
-}
-
-.speed-slider {
-    flex: 1;
-    height: 8px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: linear-gradient(to right,
-            #f0932b 0%,
-            #f0932b var(--speed-percent, 100%),
-            var(--bg-tertiary) var(--speed-percent, 100%),
-            var(--bg-tertiary) 100%);
-    border-radius: var(--radius-full);
-    outline: none;
-    cursor: pointer;
-}
-
-.speed-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 24px;
-    height: 24px;
-    background: var(--primary-gradient);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.2);
-    transition: all 0.2s ease;
-}
-
-.speed-slider::-webkit-slider-thumb:active {
-    transform: scale(1.15);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6), 0 0 0 6px rgba(102, 126, 234, 0.15);
-}
-
-.speed-slider::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
-    background: var(--primary-gradient);
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
-}
-
-.speed-hint {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    text-align: center;
-    margin-top: var(--spacing-xs);
-    transition: color 0.3s ease;
-}
-
-/* Speed level colors */
-.speed-control[data-level="slow"] .speed-value {
-    background: linear-gradient(135deg, #e17055, #d63031);
-    -webkit-background-clip: text;
-    background-clip: text;
-}
-
-.speed-control[data-level="medium"] .speed-value {
-    background: linear-gradient(135deg, #f0932b, #e17055);
-    -webkit-background-clip: text;
-    background-clip: text;
-}
-
-.speed-control[data-level="fast"] .speed-value {
+.scan-mode-btn.active[data-mode="optimize"] .mode-name {
     background: linear-gradient(135deg, #00b894, #00cec9);
     -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     background-clip: text;
 }
 
-.speed-control[data-level="turbo"] .speed-value {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+.scan-mode-btn.active[data-mode="standart"] {
+    background: linear-gradient(135deg, rgba(9, 132, 227, 0.2), rgba(116, 185, 255, 0.2));
+    border-color: #0984e3;
+    box-shadow: 0 0 20px rgba(9, 132, 227, 0.3);
+}
+
+.scan-mode-btn.active[data-mode="standart"] .mode-name {
+    background: linear-gradient(135deg, #0984e3, #74b9ff);
     -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     background-clip: text;
+}
+
+.scan-mode-info {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: var(--spacing-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
 }
 
 /* Scan success animation */

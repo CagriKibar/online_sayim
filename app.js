@@ -9,9 +9,9 @@ class BarcodeStockApp {
         this.isScanning = false;
         this.editingProduct = null;
         this.lastScanTime = 0;
-        this.baseCooldown = 350; // Temel cooldown (ms)
-        this.scanCooldown = 350; // Aktif cooldown
-        this.scanSpeed = 100; // Tarama hızı yüzdesi (25-100)
+        this.scanCooldown = 350; // Aktif cooldown - mod sisteminden güncellenir
+        this.currentScanMode = 'optimize'; // Varsayılan mod
+        this.currentModeConfig = null;
 
         this.init();
     }
@@ -74,67 +74,166 @@ class BarcodeStockApp {
         document.getElementById('edit-decrease').addEventListener('click', () => this.adjustEditQuantity(-1));
         document.querySelector('#edit-modal .modal-backdrop').addEventListener('click', () => this.hideEditModal());
 
-        // Speed slider
-        const speedSlider = document.getElementById('speed-slider');
-        if (speedSlider) {
-            speedSlider.addEventListener('input', (e) => this.updateScanSpeed(e.target.value));
-            // Load saved speed
-            const savedSpeed = localStorage.getItem('barcode_scan_speed');
-            if (savedSpeed) {
-                speedSlider.value = savedSpeed;
-                this.updateScanSpeed(savedSpeed);
-            }
-        }
+        // Scan mode buttons
+        document.querySelectorAll('.scan-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.setScanMode(btn.dataset.mode));
+        });
+
+        // Initialize scan mode system
+        this.initScanModeSystem();
     }
 
     // =============================================
-    // SPEED CONTROL
+    // SCAN MODE SYSTEM - iOS & Android Optimized
     // =============================================
 
-    updateScanSpeed(value) {
-        this.scanSpeed = parseInt(value);
+    initScanModeSystem() {
+        // Cihaz tespiti
+        this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        this.isAndroid = /Android/.test(navigator.userAgent);
 
-        // Cooldown hesapla: Düşük hız = yüksek cooldown, Yüksek hız = düşük cooldown
-        // 100% = 200ms, 25% = 1200ms
-        this.scanCooldown = Math.round(this.baseCooldown + (100 - this.scanSpeed) * 10);
+        // Cihaz tipini göster
+        const deviceEl = document.getElementById('device-type');
+        if (deviceEl) {
+            if (this.isIOS) {
+                deviceEl.textContent = '🍎 iOS';
+                deviceEl.classList.add('ios');
+            } else if (this.isAndroid) {
+                deviceEl.textContent = '🤖 Android';
+                deviceEl.classList.add('android');
+            } else {
+                deviceEl.textContent = '💻 Desktop';
+            }
+        }
+
+        // Kaydedilmiş modu yükle veya varsayılan olarak "optimize" kullan
+        const savedMode = localStorage.getItem('barcode_scan_mode') || 'optimize';
+        this.setScanMode(savedMode);
+    }
+
+    // Platform-spesifik mod konfigürasyonları
+    getScanModeConfig(mode) {
+        // iOS için optimize edilmiş ayarlar
+        const iosConfigs = {
+            turbo: {
+                fps: 30,
+                cooldown: 200,
+                resolution: { width: 1920, height: 1080 },
+                qrbox: 280,
+                info: '🚀 iOS Turbo - Maksimum hız, sürekli tarama'
+            },
+            optimize: {
+                fps: 25,
+                cooldown: 350,
+                resolution: { width: 1920, height: 1080 },
+                qrbox: 300,
+                info: '⚡ iOS Optimize - Hız ve doğruluk dengesi (Önerilen)'
+            },
+            standart: {
+                fps: 15,
+                cooldown: 600,
+                resolution: { width: 1280, height: 720 },
+                qrbox: 320,
+                info: '🎯 iOS Standart - Yüksek doğruluk, düşük pil tüketimi'
+            }
+        };
+
+        // Android için optimize edilmiş ayarlar
+        const androidConfigs = {
+            turbo: {
+                fps: 30,
+                cooldown: 150,
+                resolution: { width: 1920, height: 1080 },
+                qrbox: 260,
+                info: '🚀 Android Turbo - Ultra hızlı tarama'
+            },
+            optimize: {
+                fps: 20,
+                cooldown: 300,
+                resolution: { width: 1920, height: 1080 },
+                qrbox: 280,
+                info: '⚡ Android Optimize - Dengeli performans (Önerilen)'
+            },
+            standart: {
+                fps: 12,
+                cooldown: 500,
+                resolution: { width: 1280, height: 720 },
+                qrbox: 300,
+                info: '🎯 Android Standart - Hassas okuma modu'
+            }
+        };
+
+        // Desktop/diğer cihazlar için
+        const defaultConfigs = {
+            turbo: {
+                fps: 25,
+                cooldown: 250,
+                resolution: { width: 1920, height: 1080 },
+                qrbox: 300,
+                info: '🚀 Turbo - Hızlı tarama modu'
+            },
+            optimize: {
+                fps: 20,
+                cooldown: 400,
+                resolution: { width: 1280, height: 720 },
+                qrbox: 280,
+                info: '⚡ Optimize - Dengeli mod (Önerilen)'
+            },
+            standart: {
+                fps: 10,
+                cooldown: 600,
+                resolution: { width: 1280, height: 720 },
+                qrbox: 300,
+                info: '🎯 Standart - Hassas okuma'
+            }
+        };
+
+        if (this.isIOS) {
+            return iosConfigs[mode] || iosConfigs.optimize;
+        } else if (this.isAndroid) {
+            return androidConfigs[mode] || androidConfigs.optimize;
+        } else {
+            return defaultConfigs[mode] || defaultConfigs.optimize;
+        }
+    }
+
+    setScanMode(mode) {
+        this.currentScanMode = mode;
+        const config = this.getScanModeConfig(mode);
+
+        // Cooldown'u güncelle
+        this.scanCooldown = config.cooldown;
+        this.currentModeConfig = config;
 
         // UI güncelle
-        const speedValue = document.getElementById('speed-value');
-        const speedHint = document.getElementById('speed-hint');
-        const speedControl = document.querySelector('.speed-control');
-        const speedSlider = document.getElementById('speed-slider');
+        document.querySelectorAll('.scan-mode-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.mode === mode) {
+                btn.classList.add('active');
+            }
+        });
 
-        if (speedValue) speedValue.textContent = `${this.scanSpeed}%`;
-
-        // Slider gradient güncelle
-        if (speedSlider) {
-            const percent = ((this.scanSpeed - 25) / 75) * 100;
-            speedSlider.style.setProperty('--speed-percent', `${percent}%`);
+        // Info güncelle
+        const infoEl = document.getElementById('scan-mode-info');
+        if (infoEl) {
+            infoEl.textContent = config.info;
         }
-
-        // Seviye ve hint güncelle
-        let level, hint;
-        if (this.scanSpeed <= 40) {
-            level = 'slow';
-            hint = 'Yavaş mod - dikkatli okuma, pil tasarrufu';
-        } else if (this.scanSpeed <= 60) {
-            level = 'medium';
-            hint = 'Orta hız - dengeli performans';
-        } else if (this.scanSpeed <= 85) {
-            level = 'fast';
-            hint = 'Hızlı mod - çoğu durum için ideal';
-        } else {
-            level = 'turbo';
-            hint = 'Turbo mod - maksimum hız 🚀';
-        }
-
-        if (speedControl) speedControl.setAttribute('data-level', level);
-        if (speedHint) speedHint.textContent = hint;
 
         // Kaydet
-        localStorage.setItem('barcode_scan_speed', this.scanSpeed);
+        localStorage.setItem('barcode_scan_mode', mode);
 
-        console.log(`⚡ Tarama hızı: ${this.scanSpeed}% | Cooldown: ${this.scanCooldown}ms`);
+        console.log(`📱 Mod: ${mode} | FPS: ${config.fps} | Cooldown: ${config.cooldown}ms | Platform: ${this.isIOS ? 'iOS' : this.isAndroid ? 'Android' : 'Desktop'}`);
+
+        // Eğer tarama aktifse, yeniden başlat
+        if (this.isScanning) {
+            this.restartScanning();
+        }
+    }
+
+    async restartScanning() {
+        await this.stopScanning();
+        setTimeout(() => this.startScanning(), 300);
     }
 
     // =============================================
@@ -235,46 +334,49 @@ class BarcodeStockApp {
                 verbose: false
             });
 
-            // 🔄 360° BARKOD TARAMA - Tüm yönler için optimize
-            // KARE tarama alanı: yatay, dikey, çapraz ve oval barkodlar için
+            // 🎯 AKILLI TARAMA - Seçilen moda göre optimize
+            // Mod config'inden değerleri al
+            const modeConfig = this.currentModeConfig || this.getScanModeConfig('optimize');
+
+            // Tarama alanı - mod'a göre ayarla
             const scanBoxSize = Math.min(
-                window.innerWidth * 0.80,   // Ekran genişliğinin %80'i
-                window.innerHeight * 0.35,  // Ekran yüksekliğinin %35'i
-                320                          // Maksimum 320px
+                window.innerWidth * 0.80,
+                window.innerHeight * 0.35,
+                modeConfig.qrbox || 300
             );
 
-            const turboConfig = {
-                fps: isIOS ? 30 : 25, // Yüksek FPS hızlı algılama için
+            const scanConfig = {
+                fps: modeConfig.fps, // Mod'a göre FPS
                 // 🔲 KARE TARAMA ALANI - TÜM YÖNLER İÇİN
-                // Kare alan hem yatay hem dikey barkodları yakalar
                 qrbox: {
                     width: Math.floor(scanBoxSize),
-                    height: Math.floor(scanBoxSize)  // Kare: width = height
+                    height: Math.floor(scanBoxSize)
                 },
-                aspectRatio: 1.0, // 1:1 kare oran - tüm yönler için ideal
-                disableFlip: false, // Ayna görüntü desteği
+                aspectRatio: 1.0,
+                disableFlip: false,
                 // TÜM BARKOD FORMATLARI - maksimum uyumluluk
                 formatsToSupport: [
-                    // Standart ürün barkodları (genelde yatay)
-                    Html5QrcodeSupportedFormats.EAN_13,      // En yaygın (Türkiye: 869)
-                    Html5QrcodeSupportedFormats.EAN_8,       // Küçük ürünler
-                    Html5QrcodeSupportedFormats.UPC_A,       // ABD ürünleri
-                    Html5QrcodeSupportedFormats.UPC_E,       // Küçük ABD ürünleri
-                    // Endüstriyel barkodlar (yatay veya dikey olabilir)
-                    Html5QrcodeSupportedFormats.CODE_128,    // Lojistik, kargo
-                    Html5QrcodeSupportedFormats.CODE_39,     // Üretim, envanter
-                    Html5QrcodeSupportedFormats.CODE_93,     // Posta, lojistik
-                    Html5QrcodeSupportedFormats.CODABAR,     // Kütüphane, kan bankası
-                    Html5QrcodeSupportedFormats.ITF,         // Koli, palet
-                    // 2D Barkodlar (yön bağımsız - oval, kare vb.)
-                    Html5QrcodeSupportedFormats.DATA_MATRIX, // Küçük parçalar, ilaç
-                    Html5QrcodeSupportedFormats.PDF_417,     // Kimlik, ehliyet (dikdörtgen)
-                    Html5QrcodeSupportedFormats.AZTEC,       // Bilet, biniş kartı (kare)
-                    Html5QrcodeSupportedFormats.QR_CODE,     // QR kodlar (kare)
-                    // Ek formatlar
-                    Html5QrcodeSupportedFormats.MAXICODE     // Kargo, UPS (altıgen/oval)
+                    // Standart ürün barkodları
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    // Endüstriyel barkodlar
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.CODE_93,
+                    Html5QrcodeSupportedFormats.CODABAR,
+                    Html5QrcodeSupportedFormats.ITF,
+                    // 2D Barkodlar
+                    Html5QrcodeSupportedFormats.DATA_MATRIX,
+                    Html5QrcodeSupportedFormats.PDF_417,
+                    Html5QrcodeSupportedFormats.AZTEC,
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.MAXICODE
                 ]
             };
+
+            console.log(`🎯 Tarama başlıyor - Mod: ${this.currentScanMode} | FPS: ${scanConfig.fps} | Cooldown: ${this.scanCooldown}ms`);
 
             // iOS için direkt facingMode kullan (kamera listesi yerine)
             if (isIOS) {
