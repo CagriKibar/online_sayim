@@ -628,12 +628,43 @@ body::before {
     }
 }
 
-/* 5 butonlu grid */
+/* 5 butonlu grid - mobil uyumlu */
 .scan-mode-buttons {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: var(--spacing-xs);
     margin-bottom: var(--spacing-sm);
+}
+
+/* Mobil için 5 buton optimize */
+@media (max-width: 480px) {
+    .scan-mode-buttons {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+    }
+
+    .scan-mode-btn {
+        padding: 8px 4px;
+    }
+
+    .scan-mode-btn .mode-icon {
+        font-size: 1.2rem;
+    }
+
+    .scan-mode-btn .mode-name {
+        font-size: 0.65rem;
+    }
+
+    .scan-mode-btn .mode-desc {
+        display: none;
+    }
+}
+
+/* Çok küçük ekranlar için 3+2 düzeni */
+@media (max-width: 359px) {
+    .scan-mode-buttons {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 .scan-mode-info {
@@ -643,6 +674,13 @@ body::before {
     padding: var(--spacing-sm);
     background: var(--bg-secondary);
     border-radius: var(--radius-sm);
+}
+
+@media (max-width: 480px) {
+    .scan-mode-info {
+        font-size: 0.7rem;
+        padding: 6px;
+    }
 }
 
 /* Scan success animation */
