@@ -705,21 +705,63 @@ class BarcodeStockApp {
         const now = Date.now();
         if (now - this.lastScanTime < this.scanCooldown) return;
         this.lastScanTime = now;
+        this.lastSuccessfulScan = now; // Focus recovery için
 
         this.addProduct(barcode.trim());
 
-        // Görsel geri bildirim - tarama animasyonu
+        // 🎯 GÖRSEL GERİ BİLDİRİM - GÜÇLÜ
         const container = document.getElementById('scanner-container');
         container.classList.add('scan-success');
+
+        // Barkod gösterge overlay'i ekle
+        this.showBarcodeOverlay(barcode);
+
         setTimeout(() => container.classList.remove('scan-success'), 500);
 
         // Vibrate on success (iPhone için önemli)
         if (navigator.vibrate) {
-            navigator.vibrate([50, 30, 50]); // Kısa titreşim paterni
+            navigator.vibrate([100, 50, 100]); // Daha güçlü titreşim
         }
 
-        // Sesli geri bildirim (opsiyonel - kullanıcı ayarlarına göre)
+        // Sesli geri bildirim
         this.playBeep();
+    }
+
+    // Başarılı okuma göstergesi - ekranda barkod göster
+    showBarcodeOverlay(barcode) {
+        // Varsa eskisini kaldır
+        const existing = document.getElementById('barcode-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'barcode-overlay';
+        overlay.innerHTML = `
+            <div class="barcode-success-icon">✅</div>
+            <div class="barcode-success-text">${barcode}</div>
+        `;
+        overlay.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 200, 0, 0.9);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            z-index: 100;
+            animation: barcodePopIn 0.3s ease, barcodePopOut 0.3s ease 0.7s forwards;
+            box-shadow: 0 10px 40px rgba(0, 200, 0, 0.5);
+            pointer-events: none;
+        `;
+
+        const container = document.getElementById('scanner-container');
+        if (container) {
+            container.appendChild(overlay);
+            setTimeout(() => overlay.remove(), 1000);
+        }
     }
 
     playBeep() {
@@ -1285,6 +1327,17 @@ class BarcodeStockApp {
             }
         };
 
+        // Video yerine container'a ekle (overlay video'yu blokluyor)
+        const container = document.getElementById('scanner-container');
+        if (container) {
+            container.style.cursor = 'crosshair';
+            container.addEventListener('click', this.handleTapToFocus);
+            // Overlay'i de tıklanabilir yap
+            const overlay = container.querySelector('.scanner-overlay');
+            if (overlay) {
+                overlay.style.pointerEvents = 'auto';
+            }
+        }
         video.addEventListener('click', this.handleTapToFocus);
         video.style.cursor = 'crosshair';
     }
