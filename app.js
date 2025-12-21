@@ -252,6 +252,18 @@ class BarcodeStockApp {
             infoEl.textContent = settings.info;
         }
 
+        // 🔴 LAZER hız kontrolü göster/gizle
+        const speedControl = document.getElementById('laser-speed-control');
+        if (speedControl) {
+            speedControl.style.display = this.laserMode ? 'block' : 'none';
+
+            // Slider event listener (bir kere ekle)
+            if (this.laserMode && !this.speedSliderInitialized) {
+                this.initSpeedSlider();
+                this.speedSliderInitialized = true;
+            }
+        }
+
         // Kaydet
         localStorage.setItem('barcode_scan_mode', mode);
 
@@ -1365,6 +1377,57 @@ class BarcodeStockApp {
 
         document.body.appendChild(indicator);
         setTimeout(() => indicator.remove(), 600);
+    }
+
+    // 🔴 Hız slider'ı başlat
+    initSpeedSlider() {
+        const slider = document.getElementById('scan-speed-slider');
+        const valueEl = document.getElementById('speed-value');
+        const msEl = document.getElementById('speed-ms');
+
+        if (!slider) return;
+
+        // Kayıtlı değeri yükle
+        const savedSpeed = localStorage.getItem('laser_scan_speed');
+        if (savedSpeed) {
+            slider.value = savedSpeed;
+            this.updateSpeedDisplay(parseInt(savedSpeed), valueEl, msEl);
+        }
+
+        slider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            this.updateSpeedDisplay(value, valueEl, msEl);
+
+            // Scan interval güncelle (ters orantı: düşük ms = hızlı tarama)
+            this.laserScanIntervalMs = 250 - value; // 50-200 arası -> 200-50ms
+
+            // Kaydet
+            localStorage.setItem('laser_scan_speed', value);
+
+            // Aktif tarama varsa interval'i yeniden başlat
+            if (this.isScanning && this.laserMode) {
+                this.restartLaserScanLoop();
+            }
+        });
+    }
+
+    // Hız göstergesi güncelle
+    updateSpeedDisplay(value, valueEl, msEl) {
+        let label = 'Orta';
+        if (value < 100) label = 'Yavaş';
+        else if (value > 150) label = 'Hızlı';
+        else if (value > 180) label = 'Çok Hızlı';
+
+        if (valueEl) valueEl.textContent = label;
+        if (msEl) msEl.textContent = 250 - value;
+    }
+
+    // Lazer tarama döngüsünü yeniden başlat
+    restartLaserScanLoop() {
+        if (this.laserScanInterval) {
+            clearInterval(this.laserScanInterval);
+        }
+        this.startLaserScanLoop();
     }
 
     // Focus recovery loop - takılan focus'u düzelt

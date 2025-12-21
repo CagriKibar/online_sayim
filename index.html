@@ -150,6 +150,20 @@
                         <span class="mode-desc">Maksimum</span>
                     </button>
                 </div>
+                <!-- 🔴 LAZER Okuma Hızı Kontrolü -->
+                <div class="laser-speed-control" id="laser-speed-control" style="display: none;">
+                    <div class="speed-control-header">
+                        <span class="speed-label">🔴 Okuma Hızı</span>
+                        <span class="speed-value" id="speed-value">Orta</span>
+                    </div>
+                    <div class="speed-slider-container">
+                        <span class="speed-min">Yavaş</span>
+                        <input type="range" id="scan-speed-slider" class="speed-slider" min="50" max="200" value="100"
+                            step="10">
+                        <span class="speed-max">Hızlı</span>
+                    </div>
+                    <div class="speed-info">Tarama aralığı: <span id="speed-ms">100</span>ms</div>
+                </div>
                 <div class="scan-mode-info" id="scan-mode-info">
                     ⚡ Optimize mod - Hız ve doğruluk dengesi (Önerilen)
                 </div>
