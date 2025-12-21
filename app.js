@@ -1530,24 +1530,51 @@ class BarcodeStockApp {
         }
     }
 
-    // Canvas'tan barkod decode et
+    // Canvas'tan barkod decode et - Multi-decoder (Html5Qrcode + ZXing)
     async decodeFromCanvas(canvas) {
-        if (!this.html5QrcodeScanner) return;
-
         try {
-            // Html5Qrcode'un scanFile metodunu canvas ile kullan
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            // 1. Html5Qrcode ile dene
+            if (this.html5QrcodeScanner) {
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                const response = await fetch(dataUrl);
+                const blob = await response.blob();
+                const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
 
-            // Blob oluştur
-            const response = await fetch(dataUrl);
-            const blob = await response.blob();
-            const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
+                try {
+                    const result = await this.html5QrcodeScanner.scanFile(file, false);
+                    if (result) {
+                        this.onScanSuccess(result);
+                        return;
+                    }
+                } catch (e) {
+                    // Html5Qrcode bulamadı, ZXing dene
+                }
+            }
 
-            // Decode et
-            const result = await this.html5QrcodeScanner.scanFile(file, false);
+            // 2. ZXing ile dene (CODE-11, GS1-128 desteği)
+            if (typeof ZXingBrowser !== 'undefined') {
+                try {
+                    const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+                    const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
 
-            if (result) {
-                this.onScanSuccess(result);
+                    // ZXing luminance source oluştur
+                    const luminanceSource = new ZXingBrowser.RGBLuminanceSource(
+                        new Uint8ClampedArray(imageData.data.buffer),
+                        canvas.width,
+                        canvas.height
+                    );
+                    const binaryBitmap = new ZXingBrowser.BinaryBitmap(
+                        new ZXingBrowser.HybridBinarizer(luminanceSource)
+                    );
+
+                    const result = codeReader.decode(binaryBitmap);
+                    if (result && result.getText()) {
+                        console.log(`📦 ZXing okuma: ${result.getText()} (${result.getBarcodeFormat()})`);
+                        this.onScanSuccess(result.getText());
+                    }
+                } catch (e) {
+                    // ZXing de bulamadı
+                }
             }
         } catch (e) {
             // Barkod bulunamadı - normal durum
