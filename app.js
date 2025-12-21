@@ -25,6 +25,11 @@ class BarcodeStockApp {
         this.laserMode = false;
         this.scanAttempts = 0;
         this.maxScanAttempts = 3; // Her frame için decoder deneme sayısı
+        this.speedSliderInitialized = false;
+
+        // Kayıtlı hız değerini yükle (slider: 50-200 -> interval: 200-50ms)
+        const savedSpeed = parseInt(localStorage.getItem('laser_scan_speed')) || 100;
+        this.laserScanIntervalMs = 250 - savedSpeed;
 
         this.init();
     }
@@ -1471,7 +1476,9 @@ class BarcodeStockApp {
             clearInterval(this.laserScanInterval);
         }
 
-        const scanInterval = this.laserMode ? 80 : 150; // Lazer modda daha hızlı
+        // Slider'dan gelen değeri kullan, yoksa varsayılan 100ms
+        const scanInterval = this.laserScanIntervalMs || 100;
+        console.log(`🔴 Lazer tarama aralığı: ${scanInterval}ms`);
 
         this.laserScanInterval = setInterval(() => {
             if (!this.isScanning || !this.videoElement || !this.laserProcessor) return;
