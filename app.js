@@ -6,13 +6,25 @@ class BarcodeStockApp {
     constructor() {
         this.products = [];
         this.html5QrcodeScanner = null;
-        this.quaggaActive = false; // QuaggaJS aktif mi?
+        this.quaggaActive = false;
         this.isScanning = false;
         this.editingProduct = null;
         this.lastScanTime = 0;
         this.scanCooldown = 350;
         this.currentScanMode = 'optimize';
         this.currentModeConfig = null;
+        this.audioContext = null; // Ses için
+
+        // 🔴 LAZER TARAMA SİSTEMİ
+        this.laserProcessor = null;
+        this.laserScanInterval = null;
+        this.videoTrack = null;
+        this.videoElement = null;
+        this.focusRecoveryTimer = null;
+        this.lastSuccessfulScan = 0;
+        this.laserMode = false;
+        this.scanAttempts = 0;
+        this.maxScanAttempts = 3; // Her frame için decoder deneme sayısı
 
         this.init();
     }
@@ -217,12 +229,14 @@ class BarcodeStockApp {
             turbo: { fps: 30, cooldown: 200, info: '🚀 Turbo mod - Maksimum hız, sürekli tarama' },
             optimize: { fps: 25, cooldown: 300, info: '⚡ Optimize mod - Hız ve doğruluk dengesi (Önerilen)' },
             standart: { fps: 15, cooldown: 500, info: '🎯 Standart mod - En hassas okuma, düşük pil tüketimi' },
-            msi: { fps: 15, cooldown: 400, info: '🏭 MSI mod - MSI, Codabar, I2of5, Code-39/93/128 destekli' }
+            msi: { fps: 15, cooldown: 400, info: '🏭 MSI mod - MSI, Codabar, I2of5, Code-39/93/128 destekli' },
+            lazer: { fps: 30, cooldown: 150, info: '🔴 LAZER mod - Endüstriyel güç, görüntü işleme destekli' }
         };
 
         const settings = modeSettings[mode] || modeSettings.optimize;
         this.currentModeConfig = { fps: settings.fps };
         this.scanCooldown = settings.cooldown;
+        this.laserMode = (mode === 'lazer');
 
         // UI güncelle
         document.querySelectorAll('.scan-mode-btn').forEach(btn => {
@@ -264,6 +278,9 @@ class BarcodeStockApp {
         }
         // QuaggaJS'i durdur
         this.stopQuaggaScanner();
+
+        // 🔴 Lazer tarayıcıyı durdur
+        this.stopLaserScanner();
     }
 
     // =============================================
@@ -544,11 +561,33 @@ class BarcodeStockApp {
             // iOS için ek optimizasyonlar: Tarama alanını highlighting
             this.optimizeScannerDOM();
 
-            // QuaggaJS'i paralel olarak başlat (MSI, Codabar desteği için)
-            // NOT: Quagga aynı video stream'i kullanamayacağı için ayrı çalışmayacak
-            // Ama Html5Qrcode zaten Codabar destekliyor
+            // 🔴 LAZER MOD - Gelişmiş görüntü işleme
+            if (this.laserMode) {
+                const container = document.getElementById('scanner-container');
+                container.classList.add('laser-mode');
 
-            this.showToast('success', '📷 Tarama Aktif', 'Tüm barkod formatları destekleniyor');
+                // Video elementini bul ve lazer taramayı başlat
+                const video = document.querySelector('#reader video');
+                if (video) {
+                    // Video hazır olduğunda lazer taramayı başlat
+                    const startLaser = () => {
+                        if (video.readyState >= 2) {
+                            this.startLaserScanner(video);
+                        } else {
+                            video.addEventListener('loadeddata', () => this.startLaserScanner(video), { once: true });
+                        }
+                    };
+                    setTimeout(startLaser, 500);
+                }
+
+                this.showToast('success', '🔴 LAZER MOD Aktif', 'Endüstriyel güç tarama başlatıldı');
+            } else {
+                // Normal mod - lazer class'ını kaldır
+                const container = document.getElementById('scanner-container');
+                container.classList.remove('laser-mode');
+
+                this.showToast('success', '📷 Tarama Aktif', 'Tüm barkod formatları destekleniyor');
+            }
 
         } catch (err) {
             console.error('Kamera hatası:', err);
@@ -1113,6 +1152,287 @@ class BarcodeStockApp {
 
         container.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
+    }
+
+    // =============================================
+    // 🔴 LAZER TARAMA SİSTEMİ - Endüstriyel Güç
+    // =============================================
+
+    // Lazer taramayı başlat
+    async startLaserScanner(video) {
+        console.log('🔴 Lazer tarama sistemi başlatılıyor...');
+
+        // LaserImageProcessor'ı başlat
+        if (window.laserProcessor) {
+            this.laserProcessor = window.laserProcessor;
+        } else if (window.LaserImageProcessor) {
+            this.laserProcessor = new window.LaserImageProcessor();
+        } else {
+            console.warn('LaserImageProcessor yüklenemedi, standart tarama kullanılacak');
+            return;
+        }
+
+        this.videoElement = video;
+
+        // Video track'i al
+        if (video.srcObject) {
+            const tracks = video.srcObject.getVideoTracks();
+            if (tracks.length > 0) {
+                this.videoTrack = tracks[0];
+                await this.optimizeCameraForLaser();
+            }
+        }
+
+        // Tap-to-focus ekle
+        this.setupTapToFocus(video);
+
+        // Focus recovery başlat
+        this.startFocusRecovery();
+
+        // Lazer tarama döngüsünü başlat
+        this.startLaserScanLoop();
+
+        console.log('🔴 Lazer tarama aktif!');
+    }
+
+    // Kamerayı lazer tarama için optimize et
+    async optimizeCameraForLaser() {
+        if (!this.videoTrack) return;
+
+        try {
+            const capabilities = this.videoTrack.getCapabilities ? this.videoTrack.getCapabilities() : {};
+            const constraints = { advanced: [] };
+
+            // Sürekli otomatik odaklama
+            if (capabilities.focusMode) {
+                constraints.advanced.push({ focusMode: 'continuous' });
+            }
+
+            // Sürekli pozlama
+            if (capabilities.exposureMode) {
+                constraints.advanced.push({ exposureMode: 'continuous' });
+            }
+
+            // Beyaz denge
+            if (capabilities.whiteBalanceMode) {
+                constraints.advanced.push({ whiteBalanceMode: 'continuous' });
+            }
+
+            // Zoom ayarı (1.2x - barkodları yakınlaştır)
+            if (capabilities.zoom && capabilities.zoom.max >= 1.2) {
+                constraints.advanced.push({ zoom: 1.2 });
+            }
+
+            if (constraints.advanced.length > 0) {
+                await this.videoTrack.applyConstraints(constraints);
+                console.log('📷 Kamera lazer modu için optimize edildi');
+            }
+        } catch (e) {
+            console.log('Kamera optimizasyonu uygulanamadı:', e);
+        }
+    }
+
+    // Tap-to-Focus özelliği
+    setupTapToFocus(video) {
+        if (!video) return;
+
+        // Önceki listener'ı kaldır
+        video.removeEventListener('click', this.handleTapToFocus);
+
+        this.handleTapToFocus = async (event) => {
+            if (!this.videoTrack) return;
+
+            const rect = video.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+
+            console.log(`👆 Tap-to-focus: (${x.toFixed(2)}, ${y.toFixed(2)})`);
+
+            // Focus göstergesi
+            this.showFocusIndicator(event.clientX, event.clientY);
+
+            try {
+                const capabilities = this.videoTrack.getCapabilities ? this.videoTrack.getCapabilities() : {};
+
+                // Point of interest desteği varsa kullan
+                if (capabilities.pointsOfInterest) {
+                    await this.videoTrack.applyConstraints({
+                        advanced: [{
+                            focusMode: 'single-shot',
+                            pointsOfInterest: [{ x, y }]
+                        }]
+                    });
+                } else if (capabilities.focusMode) {
+                    // Yoksa sadece single-shot focus yap
+                    await this.videoTrack.applyConstraints({
+                        advanced: [{ focusMode: 'single-shot' }]
+                    });
+                }
+
+                // 3 saniye sonra continuous focus'a geri dön
+                setTimeout(async () => {
+                    if (this.videoTrack && this.isScanning) {
+                        try {
+                            await this.videoTrack.applyConstraints({
+                                advanced: [{ focusMode: 'continuous' }]
+                            });
+                        } catch (e) { }
+                    }
+                }, 3000);
+
+            } catch (e) {
+                console.log('Tap-to-focus uygulanamadı:', e);
+            }
+        };
+
+        video.addEventListener('click', this.handleTapToFocus);
+        video.style.cursor = 'crosshair';
+    }
+
+    // Focus göstergesi animasyonu
+    showFocusIndicator(x, y) {
+        // Varsa eskisini kaldır
+        const existing = document.getElementById('focus-indicator');
+        if (existing) existing.remove();
+
+        const indicator = document.createElement('div');
+        indicator.id = 'focus-indicator';
+        indicator.style.cssText = `
+            position: fixed;
+            left: ${x - 30}px;
+            top: ${y - 30}px;
+            width: 60px;
+            height: 60px;
+            border: 3px solid #ff0000;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            animation: focusPulse 0.6s ease-out forwards;
+        `;
+
+        document.body.appendChild(indicator);
+        setTimeout(() => indicator.remove(), 600);
+    }
+
+    // Focus recovery loop - takılan focus'u düzelt
+    startFocusRecovery() {
+        if (this.focusRecoveryTimer) {
+            clearInterval(this.focusRecoveryTimer);
+        }
+
+        this.focusRecoveryTimer = setInterval(async () => {
+            if (!this.isScanning || !this.videoTrack) return;
+
+            const timeSinceLastScan = Date.now() - this.lastSuccessfulScan;
+
+            // 5 saniyedir başarılı tarama yoksa focus reset
+            if (timeSinceLastScan > 5000 && this.lastSuccessfulScan > 0) {
+                console.log('🔄 Focus recovery - odaklama sıfırlanıyor...');
+
+                try {
+                    // Önce manual sonra continuous
+                    await this.videoTrack.applyConstraints({
+                        advanced: [{ focusMode: 'manual' }]
+                    });
+
+                    await new Promise(r => setTimeout(r, 200));
+
+                    await this.videoTrack.applyConstraints({
+                        advanced: [{ focusMode: 'continuous' }]
+                    });
+
+                    console.log('✅ Focus recovery tamamlandı');
+                } catch (e) {
+                    console.log('Focus recovery hatası:', e);
+                }
+            }
+        }, 5000); // Her 5 saniyede kontrol
+    }
+
+    // Lazer tarama döngüsü - Canvas tabanlı
+    startLaserScanLoop() {
+        if (this.laserScanInterval) {
+            clearInterval(this.laserScanInterval);
+        }
+
+        const scanInterval = this.laserMode ? 80 : 150; // Lazer modda daha hızlı
+
+        this.laserScanInterval = setInterval(() => {
+            if (!this.isScanning || !this.videoElement || !this.laserProcessor) return;
+
+            // Cooldown kontrolü
+            const now = Date.now();
+            if (now - this.lastScanTime < this.scanCooldown) return;
+
+            this.processFrameWithLaser();
+        }, scanInterval);
+    }
+
+    // Frame'i lazer işleme ile tara
+    async processFrameWithLaser() {
+        if (!this.laserProcessor || !this.videoElement) return;
+
+        try {
+            // Görüntü işleme
+            const result = this.laserMode
+                ? this.laserProcessor.processForLaserScan(this.videoElement)
+                : this.laserProcessor.fastLaserScan(this.videoElement);
+
+            if (!result || !result.canvas) return;
+
+            // Canvas'tan decode et
+            await this.decodeFromCanvas(result.canvas);
+
+        } catch (e) {
+            // Hata görmezden gel, sürekli tarama
+        }
+    }
+
+    // Canvas'tan barkod decode et
+    async decodeFromCanvas(canvas) {
+        if (!this.html5QrcodeScanner) return;
+
+        try {
+            // Html5Qrcode'un scanFile metodunu canvas ile kullan
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+            // Blob oluştur
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+            const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
+
+            // Decode et
+            const result = await this.html5QrcodeScanner.scanFile(file, false);
+
+            if (result) {
+                this.onScanSuccess(result);
+            }
+        } catch (e) {
+            // Barkod bulunamadı - normal durum
+        }
+    }
+
+    // Lazer tarayıcıyı durdur
+    stopLaserScanner() {
+        if (this.laserScanInterval) {
+            clearInterval(this.laserScanInterval);
+            this.laserScanInterval = null;
+        }
+
+        if (this.focusRecoveryTimer) {
+            clearInterval(this.focusRecoveryTimer);
+            this.focusRecoveryTimer = null;
+        }
+
+        if (this.videoElement && this.handleTapToFocus) {
+            this.videoElement.removeEventListener('click', this.handleTapToFocus);
+        }
+
+        this.videoTrack = null;
+        this.videoElement = null;
+        this.laserProcessor = null;
+
+        console.log('🔴 Lazer tarama durduruldu');
     }
 }
 

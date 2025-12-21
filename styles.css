@@ -533,6 +533,7 @@ body::before {
     background-clip: text;
 }
 
+/* MSI Mode */
 .scan-mode-btn.active[data-mode="msi"] {
     background: linear-gradient(135deg, rgba(230, 126, 34, 0.2), rgba(211, 84, 0, 0.2));
     border-color: #e67e22;
@@ -544,6 +545,95 @@ body::before {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+}
+
+/* 🔴 LAZER MODE - Maksimum güç */
+.scan-mode-btn.laser-mode {
+    border-color: rgba(255, 0, 0, 0.3);
+}
+
+.scan-mode-btn.active[data-mode="lazer"] {
+    background: linear-gradient(135deg, rgba(255, 0, 0, 0.25), rgba(139, 0, 0, 0.25));
+    border-color: #ff0000;
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5), 0 0 40px rgba(255, 0, 0, 0.2);
+    animation: laserPulse 1.5s ease-in-out infinite;
+}
+
+.scan-mode-btn.active[data-mode="lazer"] .mode-name {
+    background: linear-gradient(135deg, #ff0000, #8b0000);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+@keyframes laserPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.5), 0 0 40px rgba(255, 0, 0, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 30px rgba(255, 0, 0, 0.7), 0 0 60px rgba(255, 0, 0, 0.3);
+    }
+}
+
+/* Lazer mod için scanner frame kırmızı olsun */
+.scanner-container.laser-mode .corner {
+    border-color: #ff0000 !important;
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+}
+
+.scanner-container.laser-mode .scan-line {
+    background: linear-gradient(90deg, transparent 0%, #ff0000 50%, transparent 100%) !important;
+    box-shadow: 0 0 30px #ff0000, 0 0 60px rgba(255, 0, 0, 0.7) !important;
+    height: 4px;
+}
+
+/* Lazer mod göstergesi */
+.scanner-container.laser-mode::before {
+    content: '🔴 LAZER MOD';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: linear-gradient(135deg, #ff0000 0%, #8b0000 100%);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    z-index: 10;
+    animation: laserPulse 1.5s ease-in-out infinite;
+}
+
+/* Focus göstergesi animasyonu */
+@keyframes focusPulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+        border-width: 3px;
+    }
+
+    50% {
+        transform: scale(0.8);
+        opacity: 0.8;
+        border-width: 4px;
+    }
+
+    100% {
+        transform: scale(0.5);
+        opacity: 0;
+        border-width: 2px;
+    }
+}
+
+/* 5 butonlu grid */
+.scan-mode-buttons {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
 }
 
 .scan-mode-info {
