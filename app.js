@@ -26,6 +26,8 @@ class BarcodeStockApp {
         this.scanAttempts = 0;
         this.maxScanAttempts = 3; // Her frame için decoder deneme sayısı
         this.speedSliderInitialized = false;
+        this.lastScannedBarcode = null; // Aynı barkod kontrolü
+        this.lastBarcodeTime = 0;
 
         // Kayıtlı hız değerini yükle (slider: 50-200 -> interval: 200-50ms)
         const savedSpeed = parseInt(localStorage.getItem('laser_scan_speed')) || 100;
@@ -720,11 +722,23 @@ class BarcodeStockApp {
 
     onScanSuccess(barcode, decodedResult) {
         const now = Date.now();
-        if (now - this.lastScanTime < this.scanCooldown) return;
-        this.lastScanTime = now;
-        this.lastSuccessfulScan = now; // Focus recovery için
+        const trimmedBarcode = barcode.trim();
 
-        this.addProduct(barcode.trim());
+        // Cooldown kontrolü
+        if (now - this.lastScanTime < this.scanCooldown) return;
+
+        // 🔴 AYNI BARKOD KONTROLÜ - 3 saniye boyunca aynı barkodu tekrar okuma
+        if (this.lastScannedBarcode === trimmedBarcode && (now - this.lastBarcodeTime) < 3000) {
+            console.log(`⏳ Aynı barkod (${trimmedBarcode}) - 3 saniye bekle`);
+            return;
+        }
+
+        this.lastScanTime = now;
+        this.lastSuccessfulScan = now;
+        this.lastScannedBarcode = trimmedBarcode;
+        this.lastBarcodeTime = now;
+
+        this.addProduct(trimmedBarcode);
 
         // 🎯 GÖRSEL GERİ BİLDİRİM - GÜÇLÜ
         const container = document.getElementById('scanner-container');
@@ -1405,6 +1419,11 @@ class BarcodeStockApp {
 
             // Scan interval güncelle (ters orantı: düşük ms = hızlı tarama)
             this.laserScanIntervalMs = 250 - value; // 50-200 arası -> 200-50ms
+
+            // Cooldown da ayarla (yavaş = uzun cooldown, hızlı = kısa cooldown)
+            // Yavaş (50) -> 500ms cooldown, Hızlı (200) -> 150ms cooldown
+            this.scanCooldown = Math.max(150, 550 - value * 2);
+            console.log(`🔴 Tarama: ${this.laserScanIntervalMs}ms aralık, ${this.scanCooldown}ms cooldown`);
 
             // Kaydet
             localStorage.setItem('laser_scan_speed', value);
