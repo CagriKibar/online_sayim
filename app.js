@@ -909,6 +909,7 @@ class BarcodeStockApp {
     }
 
     deleteProduct(barcode) {
+        if (!confirm('Bu ürünü silmek istediğinize emin misiniz?')) return;
         this.products = this.products.filter(p => p.barcode !== barcode);
         this.saveToStorage();
         this.renderProducts();
@@ -1008,6 +1009,7 @@ class BarcodeStockApp {
 
             card.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
+                currentX = startX; // Initialize currentX to startX to prevent false swipe detection on tap
                 isDragging = true;
                 card.style.transition = 'none';
             }, { passive: true });
@@ -1132,8 +1134,10 @@ class BarcodeStockApp {
 
     deleteCurrentProduct() {
         if (!this.editingProduct) return;
-        this.deleteProduct(this.editingProduct.barcode);
-        this.hideEditModal();
+        if (confirm('Bu ürünü silmek istediğinize emin misiniz?')) {
+            this.deleteProduct(this.editingProduct.barcode);
+            this.hideEditModal();
+        }
     }
 
     adjustEditQuantity(delta) {
