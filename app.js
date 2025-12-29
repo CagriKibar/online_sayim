@@ -29,9 +29,14 @@ class BarcodeStockApp {
         this.lastScannedBarcode = null; // Aynı barkod kontrolü
         this.lastBarcodeTime = 0;
 
-        // Kayıtlı hız değerini yükle (slider: 50-200 -> interval: 200-50ms)
+        // Kaydedilmiş hız değerini yükle (slider: 50-200 -> interval: 200-50ms)
         const savedSpeed = parseInt(localStorage.getItem('laser_scan_speed')) || 100;
         this.laserScanIntervalMs = 250 - savedSpeed;
+
+        // Çoklu Kamera Desteği
+        this.availableCameras = [];
+        this.currentCameraIndex = 0; // Varsayılan kamera indexi
+        this.camerasInitialized = false;
 
         this.init();
     }
@@ -67,6 +72,7 @@ class BarcodeStockApp {
         // Scanner controls
         document.getElementById('start-scan-btn').addEventListener('click', () => this.startScanning());
         document.getElementById('stop-scan-btn').addEventListener('click', () => this.stopScanning());
+        document.getElementById('switch-camera-btn').addEventListener('click', () => this.switchCamera());
 
         // Manual entry
         document.getElementById('manual-add-btn').addEventListener('click', () => this.addManualEntry());
@@ -163,27 +169,28 @@ class BarcodeStockApp {
         };
 
         // Android için optimize edilmiş ayarlar
+        // Android / Samsung Optimized Configs (High Accuracy)
         const androidConfigs = {
-            turbo: {
-                fps: 30,
-                cooldown: 150,
-                resolution: { width: 1920, height: 1080 },
-                qrbox: 260,
-                info: '🚀 Android Turbo - Ultra hızlı tarama'
-            },
-            optimize: {
-                fps: 20,
-                cooldown: 300,
-                resolution: { width: 1920, height: 1080 },
+            turbo: { // Artık "Yüksek Performans" (Hız + Doğruluk)
+                fps: 25,
+                cooldown: 200,
+                resolution: { width: { min: 1280, ideal: 1920, max: 2560 }, height: { min: 720, ideal: 1080, max: 1440 } },
                 qrbox: 280,
-                info: '⚡ Android Optimize - Dengeli performans (Önerilen)'
+                info: '🚀 Turbo - Yüksek çözünürlük ve hız (Güçlü cihazlar)'
             },
-            standart: {
-                fps: 12,
+            optimize: { // "Dengeli / Önerilen"
+                fps: 20,
+                cooldown: 350,
+                resolution: { width: { min: 1920, ideal: 2560 }, height: { min: 1080, ideal: 1440 } }, // 2K/4K hedefli
+                qrbox: 300, // Daha geniş alan
+                info: '⚡ Samsung Optimize - Yüksek netlik ve doğruluk (S24+ uyumlu)'
+            },
+            standart: { // "Maksimum Hassasiyet"
+                fps: 15, // Düşük FPS = Daha net kareler, daha az blur
                 cooldown: 500,
-                resolution: { width: 1280, height: 720 },
-                qrbox: 300,
-                info: '🎯 Android Standart - Hassas okuma modu'
+                resolution: { width: { min: 1920, ideal: 3840 }, height: { min: 1080, ideal: 2160 } }, // 4K hedefli
+                qrbox: 350, // En geniş alan
+                info: '🎯 Makro/Hassas - En yüksek detay, küçük barkodlar için'
             }
         };
 
@@ -397,6 +404,20 @@ class BarcodeStockApp {
     // BARCODE SCANNING
     // =============================================
 
+    async switchCamera() {
+        if (this.availableCameras.length < 2) return;
+
+        // Sonraki kameraya geç
+        this.currentCameraIndex = (this.currentCameraIndex + 1) % this.availableCameras.length;
+        const selectedCam = this.availableCameras[this.currentCameraIndex];
+
+        console.log(`🔄 Kamera değiştiriliyor: ${selectedCam.label} (Index: ${this.currentCameraIndex})`);
+        this.showToast('info', 'Kamera Değiştirildi', selectedCam.label || `Kamera ${this.currentCameraIndex + 1}`);
+
+        // Taramayı yeniden başlat
+        await this.restartScanning();
+    }
+
     async startScanning() {
         const container = document.getElementById('scanner-container');
         container.classList.add('active');
@@ -446,12 +467,15 @@ class BarcodeStockApp {
                 ]
             } : {
                 facingMode: { ideal: 'environment' },
-                // Android için de yüksek çözünürlük
-                width: { ideal: 1920, min: 1280 },
-                height: { ideal: 1080, min: 720 },
+                // Samsung & High-End Android için 4K/2K öncelikli
+                width: { ideal: 3840, min: 1920, max: 4096 },
+                height: { ideal: 2160, min: 1080, max: 2160 },
                 frameRate: { ideal: 30, min: 15 },
                 advanced: [
-                    { focusMode: 'continuous' }
+                    { focusMode: 'continuous' },
+                    { exposureMode: 'continuous' },
+                    { whiteBalanceMode: 'continuous' },
+                    { zoom: 1.2 } // Hafif zoom (Samsung S24 geniş açı telafisi)
                 ]
             };
 
@@ -546,29 +570,56 @@ class BarcodeStockApp {
                 );
             } else {
                 // Android/Desktop için kamera listesi
-                const cameras = await Html5Qrcode.getCameras();
-                console.log('Bulunan kameralar:', cameras);
+                if (!this.camerasInitialized) {
+                    try {
+                        const cameras = await Html5Qrcode.getCameras();
+                        console.log('Bulunan kameralar:', cameras);
 
-                if (!cameras || cameras.length === 0) {
-                    throw new Error('Kamera bulunamadı');
-                }
+                        if (cameras && cameras.length > 0) {
+                            // Arka kameraları filtrele
+                            this.availableCameras = cameras.filter(camera => {
+                                const label = camera.label.toLowerCase();
+                                return label.includes('back') || label.includes('arka') ||
+                                    label.includes('rear') || label.includes('environment') ||
+                                    label.includes('wide') || label.includes('main') || label.includes('0');
+                            });
 
-                // Arka kamerayı bul
-                let cameraId = cameras[cameras.length - 1].id; // Varsayılan: son kamera
-                for (const camera of cameras) {
-                    const label = camera.label.toLowerCase();
-                    if (label.includes('back') || label.includes('arka') ||
-                        label.includes('rear') || label.includes('environment') ||
-                        label.includes('wide') || label.includes('main')) {
-                        cameraId = camera.id;
-                        break;
+                            // Eğer filtreleme sonucu boşsa (etiket yoksa), tümünü al
+                            if (this.availableCameras.length === 0) {
+                                this.availableCameras = [...cameras];
+                            }
+
+                            // Samsung gibi cihazlarda genellikle son kamera "ana" kameradır.
+                            // Başlangıçta son kamerayı seç (eğer daha önce seçilmediyse)
+                            // Ancak, kullanıcı daha önce seçim yaptıysa onu korumalıyız ama şu an basit tutalım.
+                            if (this.availableCameras.length > 0) {
+                                this.currentCameraIndex = this.availableCameras.length - 1;
+                            }
+
+                            this.camerasInitialized = true;
+                        }
+                    } catch (e) {
+                        console.error("Kamera listesi alınamadı:", e);
                     }
                 }
 
-                console.log('Seçilen kamera:', cameraId);
+                // Çoklu kamera butonu kontrolü
+                const switchBtn = document.getElementById('switch-camera-btn');
+                if (this.availableCameras.length > 1) {
+                    switchBtn.classList.remove('hidden');
+                } else {
+                    switchBtn.classList.add('hidden');
+                }
+
+                if (this.availableCameras.length === 0) {
+                    throw new Error('Kullanılabilir arka kamera bulunamadı');
+                }
+
+                const selectedCameraId = this.availableCameras[this.currentCameraIndex].id;
+                console.log('Seçilen kamera:', selectedCameraId);
 
                 await this.html5QrcodeScanner.start(
-                    cameraId,
+                    selectedCameraId,
                     scanConfig,
                     (decodedText) => this.onScanSuccess(decodedText),
                     () => { }
@@ -699,6 +750,7 @@ class BarcodeStockApp {
         document.getElementById('scanner-container').classList.remove('active');
         document.getElementById('start-scan-btn').classList.remove('hidden');
         document.getElementById('stop-scan-btn').classList.add('hidden');
+        document.getElementById('switch-camera-btn').classList.add('hidden');
     }
 
     async stopScanning() {
@@ -718,6 +770,7 @@ class BarcodeStockApp {
         document.getElementById('scanner-container').classList.remove('active');
         document.getElementById('start-scan-btn').classList.remove('hidden');
         document.getElementById('stop-scan-btn').classList.add('hidden');
+        document.getElementById('switch-camera-btn').classList.add('hidden');
     }
 
     onScanSuccess(barcode, decodedResult) {
